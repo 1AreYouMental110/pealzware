@@ -10393,18 +10393,16 @@ run(function()
 		Name = "AnimationChanger",
 		Function = function(callback)
 			if callback then
-				AnimationChanger:Clean(runService.Heartbeat:Connect(function()
-					pcall(function()
-				        task.spawn(function()
-					        if not entityLibrary.isAlive then repeat task.wait(10) until entityLibrary.isAlive end
-							AnimationChanger:Clean(lplr.CharacterAdded:Connect(function()
-					        	if not entityLibrary.isAlive then repeat task.wait(10) until entityLibrary.isAlive end
-					            pcall(AnimateCharacter)
-					        end))
-					        pcall(AnimateCharacter)
-                        end)
-                    end)
-				end))
+				task.spawn(function()
+					if not entityLibrary.isAlive then repeat task.wait(1) until entityLibrary.isAlive or not AnimationChanger.Enabled end
+					if not AnimationChanger.Enabled then return end
+					pcall(AnimateCharacter)
+					AnimationChanger:Clean(lplr.CharacterAdded:Connect(function()
+						if not entityLibrary.isAlive then repeat task.wait(1) until entityLibrary.isAlive or not AnimationChanger.Enabled end
+						if not AnimationChanger.Enabled then return end
+						pcall(AnimateCharacter)
+					end))
+				end)
 			else
 				pcall(function() Animate.Enabled = true end)
 				Animate = nil
@@ -11932,14 +11930,11 @@ run(function()
                 local t = 0
                 animConn = runService.RenderStepped:Connect(function(dt)
                     t = t + dt * orbitSpeed
-                    local char
-                    repeat
-                        char = getTargetChar()
-                        if not char then
-                            clearCircles()
-                            task.wait(0.2)
-						end
-                    until char
+                    local char = getTargetChar()
+                    if not char then
+                        clearCircles()
+                        return
+                    end
                     local hrp = char:FindFirstChild("HumanoidRootPart") or char.PrimaryPart
                     local head = char:FindFirstChild("Head") or char.PrimaryPart
                     if not hrp or not head then return end
@@ -23749,7 +23744,7 @@ local function logRemoteUsage(remoteName, callType)
     stats.count = stats.count + 1
 
 	if shared.PealzDev then
-		print(`Logged fire from {tostring(remoteName)} | {tostring(stats.count)}`)
+		if shared.PealzDev then print(`Logged fire from {tostring(remoteName)} | {tostring(stats.count)}`) end
 	end
 
     if timeNow - stats.lastReset >= 1 then
@@ -32271,7 +32266,6 @@ run(function()
 							AntiVoidPart.Color = Color3.fromHSV(color.Hue, color.Sat, color.Value)
 							AntiVoid:Clean(runservice.RenderStepped:Connect(function()
 								if AntiVoid.Enabled then
-									print('vape.guicolor: '..tostring(color))
 									color = vape.GUIColor
 									AntiVoidPart.Color = Color3.fromHSV(color.Hue, color.Sat, color.Value)
 								end
@@ -37148,10 +37142,7 @@ run(function()
                             local Strength = returning_table["strength"]
                             local Shield = returning_table["shield"]
 
-                            print("Speed: " .. tostring(Speed))
-                            print("Strength: " .. tostring(Strength))
-                            print("Shield: " .. tostring(Shield))
-                            print("Current Upgrador: " .. tostring(current_upgrador))
+                            -- debug prints removed for performance
 
                             if returning_table[string.lower(current_upgrador)] == 3 then
                                 if Strength and Shield and Speed then
@@ -37255,8 +37246,9 @@ run(function()
 														lplr.Character:WaitForChild("HumanoidRootPart").CFrame = lplr.Character:WaitForChild("HumanoidRootPart").CFrame + Vector3.new(0,100,0)
 
 														GodMode:Clean(game:GetService("RunService").RenderStepped:Connect(function()
-															if Clone ~= nil and Clone:FindFirstChild("HumanoidRootPart") then
-																Clone.HumanoidRootPart.Position = Vector3.new(lplr.Character:WaitForChild("HumanoidRootPart").Position.X, Clone.HumanoidRootPart.Position.Y, lplr.Character:WaitForChild("HumanoidRootPart").Position.Z)
+															local hrp = lplr.Character and lplr.Character:FindFirstChild("HumanoidRootPart")
+															if Clone ~= nil and Clone:FindFirstChild("HumanoidRootPart") and hrp then
+																Clone.HumanoidRootPart.Position = Vector3.new(hrp.Position.X, Clone.HumanoidRootPart.Position.Y, hrp.Position.Z)
 															end
 														end))
 
@@ -38043,25 +38035,25 @@ run(function()
 												plr_name_frame.Text = updated_text
 											end
 										else
-											print("Tag data missing for player:", name)
+											-- print("Tag data missing for player:", name)
 										end
 									end
 								else
-									print("Streamer mode is on for player:", name)
+									-- print("Streamer mode is on for player:", name)
 								end
 							else
-								print("PlayerName frame not found for player row")
+								-- print("PlayerName frame not found for player row")
 							end
 						end
 					else
-						print("Side is nil")
+						-- print("Side is nil")
 					end
 				end
 			else
-				print("Players frame not found")
+				-- print("Players frame not found")
 			end
 		else
-			print("TabListFrame not found")
+			-- print("TabListFrame not found")
 		end
 	end
 
@@ -40143,7 +40135,7 @@ if not shared.CheatEngineMode then
 				for _, memberId in pairs(members) do
 					local memberIdStr = tostring(memberId)
 					if memberIdStr == playerIdInTeams then
-						print("Warning: Player " .. playerIdInTeams .. " has themselves in their team list.")
+						-- print("Warning: Player " .. playerIdInTeams .. " has themselves in their team list.")
 					else
 						table.insert(cleanedMembers, memberIdStr)
 					end
