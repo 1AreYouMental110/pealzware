@@ -5640,10 +5640,17 @@ function mainapi:Load(skipgui, profile)
 
 	local moduleProfileFile = resolveModuleProfileFile(self.Profile, self.Place)
 	if isfile(profilePath(moduleProfileFile)) then
-		local savedata = loadJson(profilePath(moduleProfileFile))
+		local savedata, err = loadJson(profilePath(moduleProfileFile))
+		if not savedata then
+			task.wait(0.2)
+			savedata, err = loadJson(profilePath(moduleProfileFile))
+		end
 		if not savedata then
 			savedata = {Categories = {}, Modules = {}, Legit = {}}
-			self:CreateNotification('Pealzware', 'Failed to load '..self.Profile..' profile.', 10, 'alert')
+			self:CreateNotification('Pealzware', 'Failed to load '..self.Profile..' profile. '..tostring(err), 10, 'alert')
+			pcall(function()
+				delfile(profilePath(moduleProfileFile))
+			end)
 			savecheck = false
 		end
 
@@ -5851,8 +5858,14 @@ function mainapi:Save(newprofile)
 		}
 	end
 
-	writefile(profilePath(resolveCanonicalGuiProfileFile()), httpService:JSONEncode(guidata))
-	writefile(profilePath(resolveCanonicalModuleProfileFile(self.Profile, self.Place)), httpService:JSONEncode(savedata))
+	local guiJson = httpService:JSONEncode(guidata)
+	local moduleJson = httpService:JSONEncode(savedata)
+	if guiJson and #guiJson > 2 then
+		writefile(profilePath(resolveCanonicalGuiProfileFile()), guiJson)
+	end
+	if moduleJson and #moduleJson > 2 then
+		writefile(profilePath(resolveCanonicalModuleProfileFile(self.Profile, self.Place)), moduleJson)
+	end
 end
 
 function mainapi:SaveOptions(object, savedoptions)
