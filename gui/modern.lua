@@ -330,6 +330,45 @@ local function downloadFile(path, func)
 	return (func or readfile)(path)
 end
 
+local profileManifest = shared.ProfileManifest or pload('core/profile_manifest.lua', true, true)
+shared.ProfileManifest = profileManifest
+
+local function profilePath(fileName)
+	return 'vape/profiles/'..tostring(fileName)
+end
+
+local function resolveGuiProfileFile()
+	return profileManifest.resolveExistingGuiStateFile(game.GameId, function(fileName)
+		return isfile(profilePath(fileName))
+	end)
+end
+
+local function resolveCanonicalGuiProfileFile()
+	return profileManifest.resolveCanonicalGuiStateFile(game.GameId)
+end
+
+local function resolveModuleProfileFile(profileName, placeId)
+	return profileManifest.resolveExistingProfileFile(profileName, placeId, function(fileName)
+		return isfile(profilePath(fileName))
+	end)
+end
+
+local function resolveCanonicalModuleProfileFile(profileName, placeId)
+	return profileManifest.resolveCanonicalProfileFile(profileName, placeId)
+end
+
+local function deleteModuleProfileFiles(profileName, placeId)
+	if not delfile then
+		return
+	end
+	for _, fileName in ipairs(profileManifest.getProfileFileAliases(profileName, placeId)) do
+		local filePath = profilePath(fileName)
+		if isfile(filePath) then
+			delfile(filePath)
+		end
+	end
+end
+
 --[[getcustomasset = not inputService.TouchEnabled and assetfunction and function(path)
 	return downloadFile(path, assetfunction)
 end or function(path)
@@ -4543,9 +4582,7 @@ function mainapi:CreateCategoryList(categorysettings)
 				if ind then
 					if val ~= 'default' then
 						table.remove(mainapi.Profiles, ind)
-						if isfile('vape/profiles/'..val..mainapi.Place..'.txt') and delfile then
-							delfile('vape/profiles/'..val..mainapi.Place..'.txt')
-						end
+						deleteModuleProfileFiles(val, mainapi.Place)
 					end
 				else
 					table.insert(mainapi.Profiles, {Name = val, Bind = {}})
@@ -5547,13 +5584,14 @@ function mainapi:Load(skipgui, profile)
 	local guidata = {}
 	local savecheck = true
 
-	if isfile('vape/profiles/'..game.GameId..'.gui.txt') then
-		guidata, err = loadJson('vape/profiles/'..game.GameId..'.gui.txt')
+	local guiProfileFile = resolveGuiProfileFile()
+	if isfile(profilePath(guiProfileFile)) then
+		guidata, err = loadJson(profilePath(guiProfileFile))
 		if not guidata then
 			guidata = {Categories = {}}
 			self:CreateNotification('Pealzware', 'Failed to load GUI settings. '..tostring(err), 10, 'alert')
 			pcall(function()
-				delfile('vape/profiles/'..game.GameId..'.gui.txt')
+				delfile(profilePath(guiProfileFile))
 			end)
 			savecheck = false
 		end
@@ -5600,8 +5638,9 @@ function mainapi:Load(skipgui, profile)
 		self.ProfileLabel.Size = UDim2.fromOffset(getfontsize(self.ProfileLabel.Text, self.ProfileLabel.TextSize, self.ProfileLabel.Font).X + 16, 24)
 	end
 
-	if isfile('vape/profiles/'..self.Profile..self.Place..'.txt') then
-		local savedata = loadJson('vape/profiles/'..self.Profile..self.Place..'.txt')
+	local moduleProfileFile = resolveModuleProfileFile(self.Profile, self.Place)
+	if isfile(profilePath(moduleProfileFile)) then
+		local savedata = loadJson(profilePath(moduleProfileFile))
 		if not savedata then
 			savedata = {Categories = {}, Modules = {}, Legit = {}}
 			self:CreateNotification('Pealzware', 'Failed to load '..self.Profile..' profile.', 10, 'alert')
@@ -5812,8 +5851,8 @@ function mainapi:Save(newprofile)
 		}
 	end
 
-	writefile("vape/profiles/" .. game.GameId .. ".gui.txt", httpService:JSONEncode(guidata))
-	writefile("vape/profiles/" .. self.Profile .. self.Place .. ".txt", httpService:JSONEncode(savedata))
+	writefile(profilePath(resolveCanonicalGuiProfileFile()), httpService:JSONEncode(guidata))
+	writefile(profilePath(resolveCanonicalModuleProfileFile(self.Profile, self.Place)), httpService:JSONEncode(savedata))
 end
 
 function mainapi:SaveOptions(object, savedoptions)
@@ -6207,9 +6246,7 @@ general:CreateButton({
 	Name = 'Reset current profile',
 	Function = function()
 	mainapi.Save = function() end
-		if isfile('vape/profiles/'..mainapi.Profile..mainapi.Place..'.txt') and delfile then
-			delfile('vape/profiles/'..mainapi.Profile..mainapi.Place..'.txt')
-		end
+		deleteModuleProfileFiles(mainapi.Profile, mainapi.Place)
 		shared.vapereload = true
 		pload('loader.lua', true)
 	end,

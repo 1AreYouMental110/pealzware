@@ -7,8 +7,8 @@
       "directory": "default",
       "source": "bundled",
       "files": [
-        "default6872265039.txt",
-        "default6872274481.txt"
+        "default-bedwars-lobby.txt",
+        "default-bedwars-game.txt"
       ]
     },
     {
@@ -18,8 +18,8 @@
       "directory": "closetcheat",
       "source": "bundled",
       "files": [
-        "ClosetCheat6872265039.txt",
-        "ClosetCheat6872274481.txt"
+        "closet-cheat-bedwars-lobby.txt",
+        "closet-cheat-bedwars-game.txt"
       ]
     }
   ]
