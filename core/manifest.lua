@@ -16,28 +16,25 @@ local guiFiles = {
 
 local moduleDefinitions = {
 	{
-		file = "bedwars-game-core.lua",
-		aliases = {"6872274481.lua", "8444591321.lua", "8560631822.lua"}
-	},
-	{
-		file = "bedwars-game-cheat-engine.lua",
-		aliases = {"CE6872274481.lua"}
-	},
-	{
-		file = "bedwars-game-pealzware.lua",
-		aliases = {"PW6872274481.lua"}
-	},
-	{
-		file = "bedwars-lobby-core.lua",
-		aliases = {"6872265039.lua"}
-	},
-	{
-		file = "bedwars-lobby-cheat-engine-stub.lua",
-		aliases = {"CE6872265039.lua"}
-	},
-	{
-		file = "bedwars-lobby-pealzware.lua",
-		aliases = {"PW6872265039.lua"}
+		file = "bedwars-main.lua",
+		aliases = {
+			"6872274481.lua",
+			"8444591321.lua",
+			"8560631822.lua",
+			"CE6872274481.lua",
+			"PW6872274481.lua",
+			"6872265039.lua",
+			"CE6872265039.lua",
+			"PW6872265039.lua",
+			"bedwars-game-core.lua",
+			"bedwars-game-cheat-engine.lua",
+			"bedwars-game-pealzware.lua",
+			"bedwars-lobby-core.lua",
+			"bedwars-lobby-cheat-engine-stub.lua",
+			"bedwars-lobby-pealzware.lua",
+			"bedwars-shared-core.lua",
+			"bedwars-shared-pealzware.lua"
+		}
 	}
 }
 

@@ -179,29 +179,10 @@ if not shared.VapeIndependent then
 		finishLoading()
 		return
 	end
-	pload('modules/bedwars-shared-core.lua', true)
-	if not shared.NoPealzwareModules then
-		pload('modules/bedwars-shared-pealzware.lua', true)
-	end
-	local fileName1
-	local fileName2
 	if isGame then
 		if game.PlaceId ~= 6872274481 then vape.Place = 6872274481 end
-		fileName1 = shared.CheatEngineMode and "bedwars-game-cheat-engine.lua" or "bedwars-game-core.lua"
-		fileName2 = "bedwars-game-pealzware.lua"
-	elseif isLobby then
-		fileName1 = shared.CheatEngineMode and "bedwars-lobby-cheat-engine-stub.lua" or "bedwars-lobby-core.lua"
-		fileName2 = "bedwars-lobby-pealzware.lua"
 	end
-	warn("[CheatEngineMode]: ", tostring(shared.CheatEngineMode))
-	warn("[TestingMode]: ", tostring(shared.TestingMode))
-	warn("[FileName1]: ", tostring(fileName1))
-	warn("[FileName2]: ", tostring(fileName2))
-
-	pload('modules/'..fileName1)
-	if not shared.NoPealzwareModules and fileName2 and fileName2 ~= fileName1 then
-		pload('modules/'..fileName2)
-	end
+	pload('modules/bedwars-main.lua')
 	finishLoading()
 else
 	vape.Init = finishLoading
