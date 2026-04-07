@@ -199,3 +199,4 @@ writefile(baseDirectory.."commithash2.txt", "main")
 
 -- Load the main script
 return pload('main.lua', true)
+
