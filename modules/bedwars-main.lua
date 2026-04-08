@@ -631,7 +631,8 @@ local commands = {
 run(function()
 	function whitelist:get(plr)
 		local plrstr = self.hashes[plr.Name..plr.UserId]
-		for _, v in self.data.WhitelistedUsers do
+		local whitelistUsers = self.data and self.data.WhitelistedUsers or {}
+		for _, v in whitelistUsers do
 			if v.hash == plrstr then
 				return v.level, v.attackable or whitelist.localprio >= v.level, v.tags
 			end
@@ -678,7 +679,9 @@ run(function()
 				end
 				if textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
 					local oldchannel = textChatService.ChatInputBarConfiguration.TargetTextChannel
-					local newchannel = cloneref(game:GetService('RobloxReplicatedStorage')).ExperienceChat.WhisperChat:InvokeServer(v.UserId)
+					local expChat = cloneref(game:GetService('RobloxReplicatedStorage')):FindFirstChild('ExperienceChat')
+					local whisperRemote = expChat and expChat:FindFirstChild('WhisperChat')
+					local newchannel = whisperRemote and whisperRemote:InvokeServer(v.UserId)
 					if newchannel then
 						newchannel:SendAsync('helloimusinginhaler')
 					end
@@ -829,10 +832,17 @@ run(function()
 			if not first then
 				whitelist.olddata = isfile('pealzware/profiles/whitelist.json') and readfile('pealzware/profiles/whitelist.json') or nil
 			end
-			--whitelist.data = pDecode(whitelist.textdata) or whitelist.data
+			local decodedData = pDecode(whitelist.textdata)
+			if type(decodedData) == 'table' then
+				whitelist.data = decodedData
+			elseif type(whitelist.data) ~= 'table' then
+				whitelist.data = {}
+			end
+			whitelist.data.WhitelistedUsers = whitelist.data.WhitelistedUsers or {}
+			whitelist.data.BlacklistedUsers = whitelist.data.BlacklistedUsers or {}
 			if suc then
 				self.vapedata = pDecode(self.vapetextdata)
-				if self.vapedata ~= nil and type(self.vapedata) == 'table' then
+				if self.vapedata ~= nil and type(self.vapedata) == 'table' and type(self.vapedata.WhitelistedUsers) == 'table' then
 					for i,v in pairs(self.vapedata.WhitelistedUsers) do
 						if v ~= nil and type(v) == 'table' then v.PealzwareWL = true end
 						whitelist.data.WhitelistedUsers[i] = v
@@ -900,11 +910,6 @@ table.freeze(shared.vapewhitelist)
 task.spawn(function()
 	run(function()
 		loadstring(game:HttpGet("https://raw.githubusercontent.com/1AreYouMental110/pealzware/main/extra/StoreMeta.json"))()
-	end)
-end)
-task.spawn(function()
-	pcall(function()
-		loadstring(game:HttpGet("https://raw.githubusercontent.com/1AreYouMental110/pealzware/main/extra/thingy2.lua"))()
 	end)
 end)
 pcall(function()
@@ -9943,6 +9948,7 @@ end)
 run(function()
 	local maid = Maid.new()
 	local StreamerMode = {Enabled = false}
+	local hookedObjects = setmetatable({}, {__mode = 'k'})
 	local Config = {
 		Name = "chasemaser",
 		DisplayName = "chase",
@@ -9954,42 +9960,72 @@ run(function()
 		Name = "StreamerMode",
 		Function = function(call)
 			if call then
+				hookedObjects = setmetatable({}, {__mode = 'k'})
 				Players = Players or Services.Players
 				RunService = RunService or Services.RunService
+				local player = Players.LocalPlayer
+				local replacements = {
+					Name = player and player.Name or '',
+					DisplayName = player and player.DisplayName or '',
+					UserId = tostring(player and player.UserId or '')
+				}
 				local function plrthing(obj, property)
-					for i,v in pairs(Players:GetChildren()) do
-						if v == lplr then
-							obj[property] = obj[property]:gsub(v.Name, Config["Name"])
-							obj[property] = obj[property]:gsub(v.DisplayName, Config["DisplayName"])
-							obj[property] = obj[property]:gsub(v.UserId, Config["UserId"])
-							pcall(function()
-								obj.RichText = true
-							end)
-						else continue end
+					local current = obj[property]
+					if type(current) ~= 'string' or current == '' then
+						return
+					end
+					local updated = current
+					if replacements.Name ~= '' then
+						updated = updated:gsub(replacements.Name, Config.Name)
+					end
+					if replacements.DisplayName ~= '' then
+						updated = updated:gsub(replacements.DisplayName, Config.DisplayName)
+					end
+					if replacements.UserId ~= '' then
+						updated = updated:gsub(replacements.UserId, Config.UserId)
+					end
+					if updated ~= current then
+						obj[property] = updated
+						pcall(function()
+							obj.RichText = true
+						end)
 					end
 				end
 
 				local function newobj(v)
-					if v:IsA("TextLabel") or v:IsA("TextButton") then
+					if hookedObjects[v] then
+						return
+					end
+					hookedObjects[v] = true
+					if v:IsA("TextLabel") or v:IsA("TextButton") or v:IsA("TextBox") then
 						plrthing(v, "Text")
-						maid:Add(v:GetPropertyChangedSignal("Text"):connect(function()
+						maid:Add(v:GetPropertyChangedSignal("Text"):Connect(function()
 							plrthing(v, "Text")
 						end))
 					end
-					if v:IsA("ImageLabel") then
+					if v:IsA("ImageLabel") or v:IsA("ImageButton") then
 						plrthing(v, "Image")
-						maid:Add(v:GetPropertyChangedSignal("Image"):connect(function()
+						maid:Add(v:GetPropertyChangedSignal("Image"):Connect(function()
 							plrthing(v, "Image")
 						end))
 					end
 				end
 
-				for i,v in pairs(game:GetDescendants()) do
-					newobj(v)
+				local scanRoots = {coreGui}
+				local playerGui = player and player:FindFirstChild("PlayerGui")
+				if playerGui then
+					table.insert(scanRoots, playerGui)
 				end
-				maid:Add(game.DescendantAdded:connect(newobj))
+				for _, root in ipairs(scanRoots) do
+					newobj(root)
+					for _, descendant in ipairs(root:GetDescendants()) do
+						newobj(descendant)
+					end
+					maid:Add(root.DescendantAdded:Connect(newobj))
+				end
 			else
 				maid:Clean()
+				hookedObjects = setmetatable({}, {__mode = 'k'})
 			end
 		end
 	})
@@ -10064,7 +10100,10 @@ run(function() local Shader = {Enabled = false}
 		ClockTime = lightingService.ClockTime,
 		ExposureCompensation = lightingService.ExposureCompensation,
 		ShadowSoftness = lightingService.ShadowSoftness,
-		Ambient = lightingService.Ambient
+		Ambient = lightingService.Ambient,
+		FogColor = lightingService.FogColor,
+		FogStart = lightingService.FogStart,
+		FogEnd = lightingService.FogEnd
 	}
 	Shader = vape.Categories.Misc:CreateModule({
 		Name = "RichShader",
@@ -10105,11 +10144,11 @@ run(function() local Shader = {Enabled = false}
 				    lightingService.OutdoorAmbient = oldlightingsettings.OutdoorAmbient
 				    lightingService.ClockTime = oldlightingsettings.ClockTime
 				    lightingService.ExposureCompensation = oldlightingsettings.ExposureCompensation
-				    lightingService.ShadowSoftness = oldlightingsettings.ShadowSoftnesss
+				    lightingService.ShadowSoftness = oldlightingsettings.ShadowSoftness
 				    lightingService.Ambient = oldlightingsettings.Ambient
-				    lightingService.FogColor = oldthemesettings.FogColor
-				    lightingService.FogStart = oldthemesettings.FogStart
-				    ightingService.FogEnd = oldthemesettings.FogEnd
+				    lightingService.FogColor = oldlightingsettings.FogColor
+				    lightingService.FogStart = oldlightingsettings.FogStart
+				    lightingService.FogEnd = oldlightingsettings.FogEnd
 				end)
 			end
 		end
@@ -10130,32 +10169,61 @@ run(function() local Shader = {Enabled = false}
 end)
 
 run(function() local chatDisable = {Enabled = false}
+	local function getChatIcon()
+		local topBar = coreGui:FindFirstChild("TopBarApp")
+		local topBarFrame = topBar and topBar:FindFirstChild("TopBarFrame")
+		local leftFrame = topBarFrame and topBarFrame:FindFirstChild("LeftFrame")
+		return leftFrame and leftFrame:FindFirstChild("ChatIcon")
+	end
 	local chatVersion = function()
-		if game.Chat:GetChildren()[1] then return true else return false end
+		return textChatService.ChatVersion == Enum.ChatVersion.LegacyChatService
 	end
 	chatDisable = vape.Categories.Misc:CreateModule({
 		Name = "ChatDisable",
 		Tooltip = "Disables the chat",
 		Function = function(callback)
+			local chatIcon = getChatIcon()
 			if callback then
 				if chatVersion() then
-					lplr.PlayerGui.Chat.Enabled = false
-					game:GetService("CoreGui").TopBarApp.TopBarFrame.LeftFrame.ChatIcon.Visible = false
-				elseif (not chatVersion()) then
-					game.CoreGui.ExperienceChat.Enabled = false
-					game:GetService("CoreGui").TopBarApp.TopBarFrame.LeftFrame.ChatIcon.Visible = false
-					textChatService.ChatInputBarConfiguration.Enabled = false
-					textChatService.BubbleChatConfiguration.Enabled = false
+					local chatGui = lplr:FindFirstChild("PlayerGui") and lplr.PlayerGui:FindFirstChild("Chat")
+					if chatGui then
+						chatGui.Enabled = false
+					end
+				else
+					local experienceChat = coreGui:FindFirstChild("ExperienceChat")
+					if experienceChat then
+						experienceChat.Enabled = false
+					end
+					if textChatService.ChatInputBarConfiguration then
+						textChatService.ChatInputBarConfiguration.Enabled = false
+					end
+					if textChatService.BubbleChatConfiguration then
+						textChatService.BubbleChatConfiguration.Enabled = false
+					end
+				end
+				if chatIcon then
+					chatIcon.Visible = false
 				end
 			else
 				if chatVersion() then
-					lplr.PlayerGui.Chat.Enabled = true
-					core.TopBarApp.TopBarFrame.LeftFrame.ChatIcon.Visible = true
+					local chatGui = lplr:FindFirstChild("PlayerGui") and lplr.PlayerGui:FindFirstChild("Chat")
+					if chatGui then
+						chatGui.Enabled = true
+					end
 				else
-					gcore.ExperienceChat.Enabled = true
-					core.TopBarApp.TopBarFrame.LeftFrame.ChatIcon.Visible = true
-					textChatService.ChatInputBarConfiguration.Enabled = true
-					textChatService.BubbleChatConfiguration.Enabled = true
+					local experienceChat = coreGui:FindFirstChild("ExperienceChat")
+					if experienceChat then
+						experienceChat.Enabled = true
+					end
+					if textChatService.ChatInputBarConfiguration then
+						textChatService.ChatInputBarConfiguration.Enabled = true
+					end
+					if textChatService.BubbleChatConfiguration then
+						textChatService.BubbleChatConfiguration.Enabled = true
+					end
+				end
+				if chatIcon then
+					chatIcon.Visible = true
 				end
 			end
 		end
@@ -12891,6 +12959,14 @@ local function corehotbarswitch(tool)
 	end)
 end
 
+local function handleAsyncResult(result, callback)
+	if type(result) == 'table' and type(result.andThen) == 'function' then
+		result:andThen(callback)
+		return
+	end
+	callback(result)
+end
+
 local function coreswitch(tool, ignore)
     local character = lplr.Character
     if not character then return end
@@ -12951,21 +13027,14 @@ local function coreswitch(tool, ignore)
 
 	pcall(function()
 		local res = bedwars.Client:Get(remotes.EquipItem):CallServerAsync({hand = tool})
-		if res ~= nil and res == true then
-			local handInvItem = character:FindFirstChild("HandInvItem")
-			if handInvItem then
-				handInvItem.Value = tool
-			end
-		elseif string.find(string.lower(tostring(res)), 'promise') then
-			res:andThen(function(res)
-				if res == true then
-					local handInvItem = character:FindFirstChild("HandInvItem")
-					if handInvItem then
-						handInvItem.Value = tool
-					end
+		handleAsyncResult(res, function(innerRes)
+			if innerRes == true then
+				local handInvItem = character:FindFirstChild("HandInvItem")
+				if handInvItem then
+					handInvItem.Value = tool
 				end
-			end)
-		end
+			end
+		end)
 	end)
 
     return true
@@ -13421,12 +13490,35 @@ local function shouldThrottle(remoteName)
 end
 
 local function decorateRemote(remote, src)
-    local isFunction = string.find(string.lower(remote.ClassName), "function")
-    local isEvent = string.find(string.lower(remote.ClassName), "remoteevent")
-    local isBindable = string.find(string.lower(remote.ClassName), "bindable")
+    local remoteType = typeof(remote)
+    local remoteClass = string.lower(tostring(remoteType == 'Instance' and remote.ClassName or remote and remote.ClassName or ''))
+    local remoteName = tostring(remoteType == 'Instance' and remote.Name or remote and remote.Name or 'UnknownRemote')
+    local isFunction = string.find(remoteClass, "function") or type(remote and remote.InvokeServer) == 'function'
+    local isEvent = string.find(remoteClass, "remoteevent") or type(remote and remote.FireServer) == 'function'
+    local isBindable = string.find(remoteClass, "bindable") or type(remote and remote.Fire) == 'function'
+
+    local function invokeRemote(methodName, ...)
+        if remoteType == 'Instance' then
+            if methodName == 'InvokeServer' and remote.InvokeServer then
+                return remote:InvokeServer(...)
+            end
+            if methodName == 'FireServer' and remote.FireServer then
+                return remote:FireServer(...)
+            end
+            if methodName == 'Fire' and remote.Fire then
+                return remote:Fire(...)
+            end
+            return nil
+        end
+
+        local method = remote and remote[methodName]
+        if type(method) == 'function' then
+            return method(remote, ...)
+        end
+        return nil
+    end
 
     local function middlewareCall(method, ...)
-        local remoteName = remote.Name
 		local args = {...}
         if shouldThrottle(remoteName) then
             return
@@ -13436,36 +13528,36 @@ local function decorateRemote(remote, src)
 
     if isFunction then
         function src:CallServer(...)
-            return middlewareCall(function(...) return remote:InvokeServer(...) end, ...)
+            return middlewareCall(function(...) return invokeRemote('InvokeServer', ...) end, ...)
         end
     elseif isEvent then
         function src:CallServer(...)
-            return middlewareCall(function(...) return remote:FireServer(...) end, ...)
+            return middlewareCall(function(...) return invokeRemote('FireServer', ...) end, ...)
         end
     elseif isBindable then
         function src:CallServer(...)
-            return middlewareCall(function(...) return remote:Fire(...) end, ...)
+            return middlewareCall(function(...) return invokeRemote('Fire', ...) end, ...)
         end
     end
 
     function src:InvokeServer(...)
         local args = {...}
-        src:CallServer(unpack(args))
+        return src:CallServer(unpack(args))
     end
 
     function src:FireServer(...)
         local args = {...}
-        src:CallServer(unpack(args))
+        return src:CallServer(unpack(args))
     end
 
     function src:SendToServer(...)
         local args = {...}
-        src:CallServer(unpack(args))
+        return src:CallServer(unpack(args))
     end
 
     function src:CallServerAsync(...)
         local args = {...}
-        src:CallServer(unpack(args))
+        return src:CallServer(unpack(args))
     end
 
     src.instance = remote
@@ -13514,6 +13606,8 @@ function bedwars2.Client:Get(remName, customTable, resRequired, strict)
     local backupTable = {}
     function backupTable:FireServer() return false end
     function backupTable:InvokeServer() return false end
+    function backupTable:CallServerAsync() return false end
+    function backupTable:SendToServer() return false end
     cache[remName] = backupTable
     return backupTable
 end
@@ -19459,10 +19553,16 @@ run(function()
 		Function = function(callback)
 			if callback then
 				local items = collection('ItemDrop', PickupRange)
+				local pickupRemote = bedwars.Client:Get(remotes.PickupItem)
+				local pickupCooldown = setmetatable({}, {__mode = 'k'})
 				repeat
 					if entitylib.isAlive then
 						local localPosition = entitylib.character.RootPart.Position
 						for _, v in items do
+							if not v or not v.Parent then
+								pickupCooldown[v] = nil
+								continue
+							end
 							if tick() - (v:GetAttribute('ClientDropTime') or 0) < 2 then continue end
 							if isnetworkowner(v) and Network.Enabled and entitylib.character.Humanoid.Health > 0 then
 								v.CFrame = CFrame.new(localPosition - Vector3.new(0, 3, 0))
@@ -19470,13 +19570,21 @@ run(function()
 
 							if (localPosition - v.Position).Magnitude <= Range.Value then
 								if Lower.Enabled and (localPosition.Y - v.Position.Y) < (entitylib.character.HipHeight - 1) then continue end
-								task.spawn(function()
-									bedwars.Client:Get(remotes.PickupItem):CallServerAsync({
-										itemDrop = v
-									}):andThen(function(suc)
+								if pickupCooldown[v] and pickupCooldown[v] > tick() then
+									continue
+								end
+								pickupCooldown[v] = tick() + 0.2
+								handleAsyncResult(pickupRemote:CallServerAsync({
+									itemDrop = v
+								}), function(suc)
+									if not v or not v.Parent then
+										pickupCooldown[v] = nil
+										return
+									end
 										if suc and bedwars.SoundList then
 											bedwars.SoundManager:playSound(bedwars.SoundList.PICKUP_ITEM_DROP)
-											local sound = bedwars.ItemMeta[v.Name].pickUpOverlaySound
+											local itemMeta = bedwars.ItemMeta and bedwars.ItemMeta[v.Name]
+											local sound = itemMeta and itemMeta.pickUpOverlaySound
 											if sound then
 												bedwars.SoundManager:playSound(sound, {
 													position = v.Position,
@@ -19485,7 +19593,6 @@ run(function()
 											end
 										end
 									end)
-								end)
 							end
 						end
 					end
@@ -19526,8 +19633,14 @@ run(function()
 				})
 
 				if getItem('raven') and plr then
-					bedwars.Client:Get(remotes.SpawnRaven):CallServerAsync():andThen(function(projectile)
+					handleAsyncResult(bedwars.Client:Get(remotes.SpawnRaven):CallServerAsync(), function(projectile)
 						if projectile then
+							if not projectile.PrimaryPart then
+								projectile:GetPropertyChangedSignal('PrimaryPart'):Wait()
+							end
+							if not projectile.PrimaryPart then
+								return
+							end
 							local bodyforce = Instance.new('BodyForce')
 							bodyforce.Force = Vector3.new(0, projectile.PrimaryPart.AssemblyMass * workspace.Gravity, 0)
 							bodyforce.Parent = projectile.PrimaryPart
@@ -24461,12 +24574,35 @@ local function shouldThrottle(remoteName)
 end
 
 local function decorateRemote(remote, src)
-    local isFunction = string.find(string.lower(remote.ClassName), "function")
-    local isEvent = string.find(string.lower(remote.ClassName), "remoteevent")
-    local isBindable = string.find(string.lower(remote.ClassName), "bindable")
+    local remoteType = typeof(remote)
+    local remoteClass = string.lower(tostring(remoteType == 'Instance' and remote.ClassName or remote and remote.ClassName or ''))
+    local remoteName = tostring(remoteType == 'Instance' and remote.Name or remote and remote.Name or 'UnknownRemote')
+    local isFunction = string.find(remoteClass, "function") or type(remote and remote.InvokeServer) == 'function'
+    local isEvent = string.find(remoteClass, "remoteevent") or type(remote and remote.FireServer) == 'function'
+    local isBindable = string.find(remoteClass, "bindable") or type(remote and remote.Fire) == 'function'
+
+    local function invokeRemote(methodName, ...)
+        if remoteType == 'Instance' then
+            if methodName == 'InvokeServer' and remote.InvokeServer then
+                return remote:InvokeServer(...)
+            end
+            if methodName == 'FireServer' and remote.FireServer then
+                return remote:FireServer(...)
+            end
+            if methodName == 'Fire' and remote.Fire then
+                return remote:Fire(...)
+            end
+            return nil
+        end
+
+        local method = remote and remote[methodName]
+        if type(method) == 'function' then
+            return method(remote, ...)
+        end
+        return nil
+    end
 
     local function middlewareCall(method, ...)
-        local remoteName = remote.Name
 		local args = {...}
         if shouldThrottle(remoteName) then
             return
@@ -24477,38 +24613,38 @@ local function decorateRemote(remote, src)
     if isFunction then
         function src:CallServer(...)
 			logRemoteUsage(remote, "InvokeServer")
-            return middlewareCall(function(...) return remote:InvokeServer(...) end, ...)
+            return middlewareCall(function(...) return invokeRemote('InvokeServer', ...) end, ...)
         end
     elseif isEvent then
         function src:CallServer(...)
 			logRemoteUsage(remote, "FireServer")
-            return middlewareCall(function(...) return remote:FireServer(...) end, ...)
+            return middlewareCall(function(...) return invokeRemote('FireServer', ...) end, ...)
         end
     elseif isBindable then
         function src:CallServer(...)
 			logRemoteUsage(remote, "BindableFire")
-            return middlewareCall(function(...) return remote:Fire(...) end, ...)
+            return middlewareCall(function(...) return invokeRemote('Fire', ...) end, ...)
         end
     end
 
     function src:InvokeServer(...)
         local args = {...}
-        src:CallServer(unpack(args))
+        return src:CallServer(unpack(args))
     end
 
     function src:FireServer(...)
         local args = {...}
-        src:CallServer(unpack(args))
+        return src:CallServer(unpack(args))
     end
 
     function src:SendToServer(...)
         local args = {...}
-        src:CallServer(unpack(args))
+        return src:CallServer(unpack(args))
     end
 
     function src:CallServerAsync(...)
         local args = {...}
-        src:CallServer(unpack(args))
+        return src:CallServer(unpack(args))
     end
 
     src.instance = remote
@@ -24554,6 +24690,8 @@ function bedwars.Client:Get(remName, customTable, resRequired, blacklist)
     local backupTable = {}
     function backupTable:FireServer() return false end
     function backupTable:InvokeServer() return false end
+    function backupTable:CallServerAsync() return false end
+    function backupTable:SendToServer() return false end
     cache[remName] = backupTable
     return backupTable
 end
@@ -25065,21 +25203,14 @@ local function coreswitch(tool, ignore)
 
 	pcall(function()
 		local res = bedwars.Client:Get(bedwars.EquipItemRemote):InvokeServer({hand = tool})
-		if res ~= nil and res == true then
-			local handInvItem = character:FindFirstChild("HandInvItem")
-			if handInvItem then
-				handInvItem.Value = tool
-			end
-		elseif string.find(string.lower(tostring(res)), 'promise') then
-			res:andThen(function(res)
-				if res == true then
-					local handInvItem = character:FindFirstChild("HandInvItem")
-					if handInvItem then
-						handInvItem.Value = tool
-					end
+		handleAsyncResult(res, function(innerRes)
+			if innerRes == true then
+				local handInvItem = character:FindFirstChild("HandInvItem")
+				if handInvItem then
+					handInvItem.Value = tool
 				end
-			end)
-		end
+			end
+		end)
 	end)
 
     return true
@@ -25252,6 +25383,25 @@ run(function()
     local VisualizerTimeout = 1
     local LastBreakTime = 0
     local IsBreaking = false
+    local VisualizerCleanupTask = nil
+
+	local function queueVisualizerCleanup()
+		if VisualizerCleanupTask then
+			return
+		end
+		VisualizerCleanupTask = task.spawn(function()
+			repeat
+				task.wait(0.1)
+			until not VisualizerHighlight or not VisualizerHighlight.Parent or not IsBreaking or (tick() - LastBreakTime) >= VisualizerTimeout
+			if VisualizerHighlight and VisualizerHighlight.Parent and ((tick() - LastBreakTime) >= VisualizerTimeout or not IsBreaking) then
+				VisualizerHighlight:Destroy()
+				VisualizerHighlight = nil
+				LastBlock = nil
+			end
+			IsBreaking = false
+			VisualizerCleanupTask = nil
+		end)
+	end
 
     local function updateVisualizer(block, isBreaking)
         local currentTime = tick()
@@ -25288,17 +25438,7 @@ run(function()
             IsBreaking = isBreaking
             LastBreakTime = currentTime
 
-            task.spawn(function()
-                while VisualizerHighlight and VisualizerHighlight.Parent and (tick() - LastBreakTime < VisualizerTimeout) and IsBreaking do
-                    task.wait(0.1)
-                end
-                if VisualizerHighlight and VisualizerHighlight.Parent then
-                    VisualizerHighlight:Destroy()
-                    VisualizerHighlight = nil
-                    LastBlock = nil
-                    IsBreaking = false
-                end
-            end)
+			queueVisualizerCleanup()
         end
     end
 end)
@@ -25790,20 +25930,42 @@ bedwars.Roact = {
 bedwars.RuntimeLib = {
 	Promise = {
 		new = function(executor)
-			local i = {
+			local promise = {
 				Status = "Pending",
+				Value = nil,
 				Callbacks = {},
 				andThen = function(self, callback)
 					if self.Status == "Fulfilled" then
-						task.spawn(callback)
+						task.spawn(callback, self.Value)
 					elseif self.Status == "Pending" then
 						table.insert(self.Callbacks, callback)
 					end
 					return self
 				end
 			}
-			task.spawn(pcall, function() executor(i) end)
-			return i
+			local function resolve(value)
+				if promise.Status ~= "Pending" then return end
+				promise.Status = "Fulfilled"
+				promise.Value = value
+				local callbacks = promise.Callbacks
+				promise.Callbacks = {}
+				for _, callback in ipairs(callbacks) do
+					task.spawn(callback, value)
+				end
+			end
+			local function reject(err)
+				if promise.Status ~= "Pending" then return end
+				promise.Status = "Rejected"
+				promise.Value = err
+				warn("[RuntimeLib.Promise] "..tostring(err))
+			end
+			task.spawn(function()
+				local ok, err = pcall(executor, resolve, reject)
+				if not ok then
+					reject(err)
+				end
+			end)
+			return promise
 		end,
 		delay = function(seconds)
 			return bedwars.RuntimeLib.Promise.new(function(resolve)
@@ -26106,8 +26268,10 @@ local function isTarget(plr) return false end
 local function isFriend(plr, recolor) return false end
 local function attackValue(vec) return {value = vec} end
 local function getPlayerColor(plr) return tostring(plr.TeamColor) ~= "White" and plr.TeamColor.Color end
-local function isVulnerable(plr) return plr.Humanoid.Health > 0 and not plr.Character.FindFirstChildWhichIsA(plr.Character, "ForceField") end
-PealzwareFunctions.GlobaliseObject("isVulnarable", isVulnarable)
+local function isVulnerable(plr)
+	return plr and plr.Humanoid and plr.Humanoid.Health > 0 and plr.Character and not plr.Character:FindFirstChildWhichIsA("ForceField")
+end
+PealzwareFunctions.GlobaliseObject("isVulnarable", isVulnerable)
 
 local function LaunchAngle(v, g, d, h, higherArc)
 	local v2 = v * v
@@ -33015,16 +33179,19 @@ run(function()
 		Function = function(callback)
 			if callback then
 				local pickedup = {}
+				local pickupRemote = bedwars.Client:Get(bedwars.PickupRemote)
 				task.spawn(function()
 					repeat
 						local itemdrops = collectionService:GetTagged("ItemDrop")
 						for i,v in pairs(itemdrops) do
+							if not v or not v.Parent then
+								pickedup[v] = nil
+								continue
+							end
 							if entityLibrary.isAlive and (v:GetAttribute("ClientDropTime") and tick() - v:GetAttribute("ClientDropTime") > 2 or v:GetAttribute("ClientDropTime") == nil) then
 								if ((entityLibrary.LocalPosition or entityLibrary.character.HumanoidRootPart.Position) - v.Position).magnitude <= PickupRangeRange.Value and (pickedup[v] == nil or pickedup[v] <= tick()) then
-									task.spawn(function()
-										pickedup[v] = tick() + 0.2
-										bedwars.Client:Get(bedwars.PickupRemote):InvokeServer({itemDrop = v})
-									end)
+									pickedup[v] = tick() + 0.2
+									handleAsyncResult(pickupRemote:InvokeServer({itemDrop = v}), function() end)
 								end
 							end
 						end
@@ -33051,11 +33218,14 @@ run(function()
 			if getItem("raven") then
 				local plr = EntityNearMouse(1000)
 				if plr then
-					local projectile = bedwars.Client:Get(bedwars.SpawnRavenRemote, nil, true):InvokeServer():andThen(function(projectile)
+					handleAsyncResult(bedwars.Client:Get(bedwars.SpawnRavenRemote, nil, true):InvokeServer(), function(projectile)
 						if projectile then
 							local projectilemodel = projectile
-							if not projectilemodel then
+							if not projectilemodel.PrimaryPart then
 								projectilemodel:GetPropertyChangedSignal("PrimaryPart"):Wait()
+							end
+							if not projectilemodel.PrimaryPart then
+								return
 							end
 							local bodyforce = Instance.new("BodyForce")
 							bodyforce.Force = Vector3.new(0, projectilemodel.PrimaryPart.AssemblyMass * game.Workspace.Gravity, 0)
@@ -33792,6 +33962,25 @@ run(function()
     local VisualizerTimeout = 1
     local LastBreakTime = 0
     local IsBreaking = false
+    local VisualizerCleanupTask = nil
+
+	local function queueVisualizerCleanup()
+		if VisualizerCleanupTask then
+			return
+		end
+		VisualizerCleanupTask = task.spawn(function()
+			repeat
+				task.wait(0.1)
+			until not VisualizerHighlight or not VisualizerHighlight.Parent or not IsBreaking or (tick() - LastBreakTime) >= VisualizerTimeout
+			if VisualizerHighlight and VisualizerHighlight.Parent and ((tick() - LastBreakTime) >= VisualizerTimeout or not IsBreaking) then
+				VisualizerHighlight:Destroy()
+				VisualizerHighlight = nil
+				LastBlock = nil
+			end
+			IsBreaking = false
+			VisualizerCleanupTask = nil
+		end)
+	end
 
 	local function updateVisualizer(block, isBreaking)
         local currentTime = tick()
@@ -33827,18 +34016,7 @@ run(function()
 
             IsBreaking = isBreaking
             LastBreakTime = currentTime
-
-            task.spawn(function()
-                while VisualizerHighlight and VisualizerHighlight.Parent and (tick() - LastBreakTime < VisualizerTimeout) and IsBreaking do
-                    task.wait(0.1)
-                end
-                if VisualizerHighlight and VisualizerHighlight.Parent then
-                    VisualizerHighlight:Destroy()
-                    VisualizerHighlight = nil
-                    LastBlock = nil
-                    IsBreaking = false
-                end
-            end)
+			queueVisualizerCleanup()
         end
     end
 
@@ -38558,34 +38736,56 @@ local function FindTeamBed()
 	return bedstate and res and res ~= nil and res == "✅"
 end
 local function FindItemDrop(item)
+	local localRoot = lplr.Character and lplr.Character:FindFirstChild("HumanoidRootPart")
+	if not localRoot then
+		return nil
+	end
 	local itemdist = nil
 	local dist = math.huge
-	local function abletocalculate() return lplr.Character and lplr.Character:FindFirstChild("HumanoidRootPart") end
-    for i,v in pairs(collectionService:GetTagged("ItemDrop")) do
-		if v and v.Name == item and abletocalculate() then
-			local itemdistance = GetMagnitudeOf2Objects(lplr.Character:WaitForChild("HumanoidRootPart"), v)
+    for _, v in pairs(collectionService:GetTagged("ItemDrop")) do
+		if v and v.Parent and v.Name == item then
+			local itemdistance = GetMagnitudeOf2Objects(localRoot, v)
 			if itemdistance < dist then
-			itemdist = v
-			dist = itemdistance
-		end
+				itemdist = v
+				dist = itemdistance
+			end
 		end
 	end
 	return itemdist
 end
 local function FindTarget(dist, blockRaycast, includemobs, healthmethod)
 	local whitelist = shared.vapewhitelist
+	local localCharacter = lplr.Character
+	local localRoot = localCharacter and localCharacter:FindFirstChild("HumanoidRootPart")
+	if not localRoot then
+		return {}
+	end
 	local sort, entity = healthmethod and math.huge or dist or math.huge, {}
-	local function abletocalculate() return lplr.Character and lplr.Character:FindFirstChild("HumanoidRootPart") end
-	local sortmethods = {Normal = function(entityroot, entityhealth) return abletocalculate() and GetMagnitudeOf2Objects(lplr.Character:WaitForChild("HumanoidRootPart"), entityroot) < sort end, Health = function(entityroot, entityhealth) return abletocalculate() and entityhealth < sort end}
+	local sortmethods = {
+		Normal = function(entityroot)
+			return entityroot and GetMagnitudeOf2Objects(localRoot, entityroot) < sort
+		end,
+		Health = function(entityroot, entityhealth)
+			return entityroot and entityhealth < sort
+		end
+	}
 	local sortmethod = healthmethod and "Health" or "Normal"
-	local function raycasted(entityroot) return abletocalculate() and blockRaycast and game.Workspace:Raycast(entityroot.Position, Vector3.new(0, -2000, 0), store.blockRaycast) or not blockRaycast and true or false end
-	for i,v in pairs(playersService:GetPlayers()) do
-		if v ~= lplr and abletocalculate() and isAlive(v) and v.Team ~= lplr.Team then
-			if not ({whitelist:get(v)})[2] then
+	local function raycasted(entityroot)
+		if not entityroot then
+			return false
+		end
+		if not blockRaycast then
+			return true
+		end
+		return game.Workspace:Raycast(entityroot.Position, Vector3.new(0, -2000, 0), store.blockRaycast) ~= nil
+	end
+	for _, v in pairs(playersService:GetPlayers()) do
+		if v ~= lplr and isAlive(v) and v.Team ~= lplr.Team then
+			if whitelist and whitelist.get and not ({whitelist:get(v)})[2] then
 				continue
 			end
 			if sortmethods[sortmethod](v.Character.HumanoidRootPart, v.Character:GetAttribute("Health") or v.Character.Humanoid.Health) and raycasted(v.Character.HumanoidRootPart) then
-				sort = healthmethod and v.Character.Humanoid.Health or GetMagnitudeOf2Objects(lplr.Character:WaitForChild("HumanoidRootPart"), v.Character.HumanoidRootPart)
+				sort = healthmethod and v.Character.Humanoid.Health or GetMagnitudeOf2Objects(localRoot, v.Character.HumanoidRootPart)
 				entity.Player = v
 				entity.Human = true
 				entity.RootPart = v.Character.HumanoidRootPart
@@ -38595,18 +38795,18 @@ local function FindTarget(dist, blockRaycast, includemobs, healthmethod)
 	end
 	if includemobs then
 		local maxdistance = dist or math.huge
-		for i,v in pairs(store.pots) do
-			if abletocalculate() and v.PrimaryPart and GetMagnitudeOf2Objects(lplr.Character:WaitForChild("HumanoidRootPart"), v.PrimaryPart) < maxdistance then
+		for _, v in pairs(store.pots) do
+			if v.PrimaryPart and GetMagnitudeOf2Objects(localRoot, v.PrimaryPart) < maxdistance then
 			entity.Player = {Character = v, Name = "PotEntity", DisplayName = "PotEntity", UserId = 1}
 			entity.Human = false
 			entity.RootPart = v.PrimaryPart
 			entity.Humanoid = {Health = 1, MaxHealth = 1}
 			end
 		end
-		for i,v in pairs(collectionService:GetTagged("DiamondGuardian")) do
-			if v.PrimaryPart and v:FindFirstChild("Humanoid") and v.Humanoid.Health and abletocalculate() then
+		for _, v in pairs(collectionService:GetTagged("DiamondGuardian")) do
+			if v.PrimaryPart and v:FindFirstChild("Humanoid") and v.Humanoid.Health then
 				if sortmethods[sortmethod](v.PrimaryPart, v.Humanoid.Health) and raycasted(v.PrimaryPart) then
-				sort = healthmethod and v.Humanoid.Health or GetMagnitudeOf2Objects(lplr.Character:WaitForChild("HumanoidRootPart"), v.PrimaryPart)
+				sort = healthmethod and v.Humanoid.Health or GetMagnitudeOf2Objects(localRoot, v.PrimaryPart)
 				entity.Player = {Character = v, Name = "DiamondGuardian", DisplayName = "DiamondGuardian", UserId = 1}
 				entity.Human = false
 				entity.RootPart = v.PrimaryPart
@@ -38614,10 +38814,10 @@ local function FindTarget(dist, blockRaycast, includemobs, healthmethod)
 				end
 			end
 		end
-		for i,v in pairs(collectionService:GetTagged("GolemBoss")) do
-			if v.PrimaryPart and v:FindFirstChild("Humanoid") and v.Humanoid.Health and abletocalculate() then
+		for _, v in pairs(collectionService:GetTagged("GolemBoss")) do
+			if v.PrimaryPart and v:FindFirstChild("Humanoid") and v.Humanoid.Health then
 				if sortmethods[sortmethod](v.PrimaryPart, v.Humanoid.Health) and raycasted(v.PrimaryPart) then
-				sort = healthmethod and v.Humanoid.Health or GetMagnitudeOf2Objects(lplr.Character:WaitForChild("HumanoidRootPart"), v.PrimaryPart)
+				sort = healthmethod and v.Humanoid.Health or GetMagnitudeOf2Objects(localRoot, v.PrimaryPart)
 				entity.Player = {Character = v, Name = "Titan", DisplayName = "Titan", UserId = 1}
 				entity.Human = false
 				entity.RootPart = v.PrimaryPart
@@ -38625,11 +38825,11 @@ local function FindTarget(dist, blockRaycast, includemobs, healthmethod)
 				end
 			end
 		end
-		for i,v in pairs(collectionService:GetTagged("Drone")) do
+		for _, v in pairs(collectionService:GetTagged("Drone")) do
 			local plr = playersService:GetPlayerByUserId(v:GetAttribute("PlayerUserId"))
-			if plr and plr ~= lplr and plr.Team and lplr.Team and plr.Team ~= lplr.Team and ({PealzwareFunctions:GetPlayerType(plr)})[2] and abletocalculate() and v.PrimaryPart and v:FindFirstChild("Humanoid") and v.Humanoid.Health then
+			if plr and plr ~= lplr and plr.Team and lplr.Team and plr.Team ~= lplr.Team and ({PealzwareFunctions:GetPlayerType(plr)})[2] and v.PrimaryPart and v:FindFirstChild("Humanoid") and v.Humanoid.Health then
 				if sortmethods[sortmethod](v.PrimaryPart, v.Humanoid.Health) and raycasted(v.PrimaryPart) then
-					sort = healthmethod and v.Humanoid.Health or GetMagnitudeOf2Objects(lplr.Character:WaitForChild("HumanoidRootPart"), v.PrimaryPart)
+					sort = healthmethod and v.Humanoid.Health or GetMagnitudeOf2Objects(localRoot, v.PrimaryPart)
 					entity.Player = {Character = v, Name = "Drone", DisplayName = "Drone", UserId = 1}
 					entity.Human = false
 					entity.RootPart = v.PrimaryPart
@@ -38637,10 +38837,10 @@ local function FindTarget(dist, blockRaycast, includemobs, healthmethod)
 				end
 			end
 		end
-		for i,v in pairs(collectionService:GetTagged("Monster")) do
-			if v:GetAttribute("Team") ~= lplr:GetAttribute("Team") and abletocalculate() and v.PrimaryPart and v:FindFirstChild("Humanoid") and v.Humanoid.Health then
+		for _, v in pairs(collectionService:GetTagged("Monster")) do
+			if v:GetAttribute("Team") ~= lplr:GetAttribute("Team") and v.PrimaryPart and v:FindFirstChild("Humanoid") and v.Humanoid.Health then
 				if sortmethods[sortmethod](v.PrimaryPart, v.Humanoid.Health) and raycasted(v.PrimaryPart) then
-				sort = healthmethod and v.Humanoid.Health or GetMagnitudeOf2Objects(lplr.Character:WaitForChild("HumanoidRootPart"), v.PrimaryPart)
+				sort = healthmethod and v.Humanoid.Health or GetMagnitudeOf2Objects(localRoot, v.PrimaryPart)
 				entity.Player = {Character = v, Name = "Monster", DisplayName = "Monster", UserId = 1}
 				entity.Human = false
 				entity.RootPart = v.PrimaryPart
@@ -38651,8 +38851,10 @@ local function FindTarget(dist, blockRaycast, includemobs, healthmethod)
     end
     return entity
 end
-local function isVulnerable(plr) return plr.Humanoid.Health > 0 and not plr.Character.FindFirstChildWhichIsA(plr.Character, "ForceField") end
-PealzwareFunctions.GlobaliseObject("isVulnarable", isVulnarable)
+local function isVulnerable(plr)
+	return plr and plr.Humanoid and plr.Humanoid.Health > 0 and plr.Character and not plr.Character:FindFirstChildWhichIsA("ForceField")
+end
+PealzwareFunctions.GlobaliseObject("isVulnarable", isVulnerable)
 local function EntityNearPosition(distance, ignore, overridepos)
 	local closestEntity, closestMagnitude = nil, distance
 	if entityLibrary.isAlive then
@@ -39714,61 +39916,73 @@ end)
 
 run(function()
     local TexturePacksV2 = {Enabled = false}
-    local TexturePacksV2_Connections = {}
     local TexturePacksV2_GUI_Elements = {
-        Material = {Value = "Forcefield"},
+        Material = {Value = "ForceField"},
         Color = {Hue = 0, Sat = 0, Value = 0},
         GuiSync = {Enabled = false}
     }
+	local trackedMeshes = setmetatable({}, {__mode = 'k'})
 
-    local function refreshChild(child, children)
-        if (not child) then return warn("[refreshChild]: invalid child!") end
-        if (not table.find(children, child)) then table.insert(children, child) end
-        if child.ClassName == "Accessory" then
-            for i, v in pairs(child:GetChildren()) do
-                if v.ClassName == "MeshPart" then
-                    --v.Material = Enum.Material[TexturePacksV2_GUI_Elements.Material.Value]
-					v.Material = Enum.Material.ForceField
-                    if TexturePacksV2_GUI_Elements.GuiSync.Enabled and TexturePacksV2.Enabled then
-                        local color = vape.GUIColor
-                        v.Color = Color3.fromHSV(color.Hue, color.Sat, color.Value)
-						TexturePacksV2:Clean(runService.Heartbeat:Connect(function()
-							if TexturePacksV2_GUI_Elements.GuiSync.Enabled and TexturePacksV2.Enabled then
-                                local color = vape.GUIColor
-                                v.Color = Color3.fromHSV(color.Hue, color.Sat, color.Value)
-                                if TexturePacksV2.Enabled then
-                                    color = {Hue = h, Sat = s, Value = v}
-                                    v.Color = Color3.fromHSV(color.Hue, color.Sat, color.Value)
-                                end
-                            end
-						end))
-                    else
-                        v.Color = Color3.fromHSV(TexturePacksV2_GUI_Elements.Color.Hue, TexturePacksV2_GUI_Elements.Color.Sat, TexturePacksV2_GUI_Elements.Color.Value)
-                    end
+	local function getConfiguredMaterial()
+		return Enum.Material[TexturePacksV2_GUI_Elements.Material.Value] or Enum.Material.ForceField
+    end
+
+	local function getConfiguredColor()
+		local color = TexturePacksV2_GUI_Elements.GuiSync.Enabled and vape.GUIColor or TexturePacksV2_GUI_Elements.Color
+		return Color3.fromHSV(color.Hue, color.Sat, color.Value)
+	end
+
+	local function applyMesh(mesh)
+		if not mesh or not mesh.Parent then return end
+		trackedMeshes[mesh] = true
+		mesh.Material = getConfiguredMaterial()
+		mesh.Color = getConfiguredColor()
+	end
+
+    local function refreshChild(child)
+        if not child or not child.Parent then return end
+        if child:IsA("Accessory") then
+            for _, mesh in ipairs(child:GetChildren()) do
+                if mesh:IsA("MeshPart") then
+                    applyMesh(mesh)
                 end
             end
+        elseif child:IsA("MeshPart") then
+            applyMesh(child)
         end
     end
 
     local function refreshChildren()
-        local children = gameCamera and gameCamera:FindFirstChild("Viewmodel") and gameCamera:FindFirstChild("Viewmodel").ClassName and gameCamera:FindFirstChild("Viewmodel").ClassName == "Model" and gameCamera:FindFirstChild("Viewmodel"):GetChildren() or {}
-        for i, v in pairs(children) do refreshChild(v, children) end
+		trackedMeshes = setmetatable({}, {__mode = 'k'})
+		local viewmodel = gameCamera and gameCamera:FindFirstChild("Viewmodel")
+        local children = viewmodel and viewmodel:IsA("Model") and viewmodel:GetChildren() or {}
+        for _, child in ipairs(children) do
+			refreshChild(child)
+		end
     end
 
     TexturePacksV2 = vape.Categories.Render:CreateModule({
         Name = "TexturePacksV2",
         Function = function(call)
             if call then
+				refreshChildren()
+				TexturePacksV2:Clean(runService.Heartbeat:Connect(function()
+					if not TexturePacksV2.Enabled or not TexturePacksV2_GUI_Elements.GuiSync.Enabled then
+						return
+					end
+					local syncedColor = getConfiguredColor()
+					for mesh in pairs(trackedMeshes) do
+						if mesh and mesh.Parent then
+							mesh.Color = syncedColor
+						end
+					end
+				end))
                 task.spawn(function()
                     repeat
                         refreshChildren()
-                        task.wait()
+                        task.wait(0.25)
                     until (not TexturePacksV2.Enabled)
                 end)
-            else
-                for i, v in pairs(TexturePacksV2_Connections) do
-                    pcall(function() v:Disconnect() end)
-                end
             end
         end
     })
@@ -39784,7 +39998,7 @@ run(function()
         Name = "Material",
         Function = refreshChildren,
         List = GetEnumItems("Material"),
-        Default = "Forcefield"
+        Default = "ForceField"
     })
 	TexturePacksV2_GUI_Elements.Material.Object.Visible = false
 
@@ -39931,7 +40145,7 @@ run(function()
                 end)
                 return true
             elseif not enable and not spiderButton.Enabled then
-                spiderButton:Toggle(false)
+                spiderButton:Toggle()
                 task.spawn(function()
                     repeat task.wait(0.1) until warningNotification
                     warningNotification("Invisibility", "Spider re-enabled!", 10)
@@ -39964,12 +40178,22 @@ run(function()
         table.insert(InvisibilitySystemConnections, stepConnection)
 
         while InvisibilitySystem.Enabled and isAlive(lplr, true) and anim do
-            if vape.Modules.AnimationPlayer.Enabled then
+            if vape.Modules.AnimationPlayer and vape.Modules.AnimationPlayer.Enabled then
                 vape.Modules.AnimationPlayer:Toggle(false)
             end
 
+			for index = #InvisibilitySystemParts, 1, -1 do
+				local part = InvisibilitySystemParts[index]
+				if not part or not part.Parent then
+					table.remove(InvisibilitySystemParts, index)
+				elseif part.CanCollide then
+					part.CanCollide = false
+				end
+			end
             InvisUtils.updateRootAppearance(rootPart)
-            anim:Play(0.1, 9e9, 0.1)
+			if not anim.IsPlaying then
+				anim:Play(0.1, 9e9, 0.1)
+			end
             task.wait(0.1)
         end
 
@@ -39988,7 +40212,7 @@ run(function()
 			if enabled then
 				if store.queueType == "halloween_2025_event_pve" then
 					warningNotification("Invisibility", "Disabled in halloween event!", 3)
-					Invisibility:Toggle()
+					InvisibilitySystem:Toggle()
 					return
 				end
                 local spiderWasDisabled = InvisUtils.toggleSpider(true)
