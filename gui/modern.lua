@@ -223,22 +223,23 @@ local function resolveTooltipText(name, tooltipText, controlType)
 	if tooltipText and tostring(tooltipText):gsub('%s', '') ~= '' then
 		return tooltipText
 	end
+	local safeName = tostring(name or controlType or 'Setting')
 
 	local controlTips = {
-		Button = 'Run '..name..'.',
-		ColorSlider = 'Adjust '..name..'.',
-		Dropdown = 'Select '..name..'.',
-		Module = 'Toggle '..name..' and open its settings.',
-		Slider = 'Adjust '..name..'.',
-		Targets = 'Choose targets for '..name..'.',
-		TargetsButton = 'Configure '..name..'.',
-		TextBox = 'Edit '..name..'.',
-		TextList = 'Manage '..name..'.',
-		Toggle = 'Toggle '..name..'.',
-		TwoSlider = 'Adjust '..name..' range.'
+		Button = 'Run '..safeName..'.',
+		ColorSlider = 'Adjust '..safeName..'.',
+		Dropdown = 'Select '..safeName..'.',
+		Module = 'Toggle '..safeName..' and open its settings.',
+		Slider = 'Adjust '..safeName..'.',
+		Targets = 'Choose targets for '..safeName..'.',
+		TargetsButton = 'Configure '..safeName..'.',
+		TextBox = 'Edit '..safeName..'.',
+		TextList = 'Manage '..safeName..'.',
+		Toggle = 'Toggle '..safeName..'.',
+		TwoSlider = 'Adjust '..safeName..' range.'
 	}
 
-	return controlTips[controlType] or name
+	return controlTips[controlType] or safeName
 end
 
 local function addTooltip(gui, text)
@@ -263,6 +264,53 @@ local function addTooltip(gui, text)
 	gui.MouseLeave:Connect(function()
 		tooltip.Visible = false
 	end)
+end
+
+local function mouseWithin(objects)
+	local mouse = inputService:GetMouseLocation()
+	for _, object in objects do
+		if object and object.Parent and object.Visible then
+			local position = object.AbsolutePosition
+			local size = object.AbsoluteSize
+			if mouse.X >= position.X and mouse.X <= (position.X + size.X) and mouse.Y >= position.Y and mouse.Y <= (position.Y + size.Y) then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+local function bindHoverGroup(objects, onEnter, onLeave)
+	local hovering = false
+	local function setHover(state)
+		if hovering == state then
+			return
+		end
+		hovering = state
+		if state then
+			onEnter()
+			return
+		end
+		onLeave()
+	end
+	local function scheduleLeave()
+		task.defer(function()
+			if not mouseWithin(objects) then
+				setHover(false)
+			end
+		end)
+	end
+
+	for _, object in objects do
+		object.MouseEnter:Connect(function()
+			setHover(true)
+		end)
+		object.MouseLeave:Connect(scheduleLeave)
+	end
+
+	return function()
+		return hovering
+	end
 end
 
 function mainapi:UpdateModuleSorting(categoryName)
@@ -737,8 +785,24 @@ components = {
 		bkg.Size = UDim2.fromOffset(200, 27)
 		bkg.Position = UDim2.fromOffset(10, 2)
 		bkg.BackgroundColor3 = color.Light(uipallet.Main, 0.05)
+		bkg.ClipsDescendants = true
 		bkg.Parent = button
 		addCorner(bkg)
+		local stroke = Instance.new('UIStroke')
+		stroke.Color = uipallet.Text
+		stroke.Thickness = 1
+		stroke.Transparency = 1
+		stroke.Parent = bkg
+		local hoverline = Instance.new('Frame')
+		hoverline.Name = 'HoverLine'
+		hoverline.AnchorPoint = Vector2.new(0, 0.5)
+		hoverline.Position = UDim2.new(0, 0, 0.5, 0)
+		hoverline.Size = UDim2.fromOffset(0, 19)
+		hoverline.BackgroundColor3 = uipallet.Text
+		hoverline.BackgroundTransparency = 1
+		hoverline.BorderSizePixel = 0
+		hoverline.Parent = bkg
+		addCorner(hoverline, UDim.new(1, 0))
 		local label = Instance.new('TextLabel')
 		label.Size = UDim2.new(1, -4, 1, -4)
 		label.Position = UDim2.fromOffset(2, 2)
@@ -750,32 +814,57 @@ components = {
 		label.Parent = bkg
 		addCorner(label, UDim.new(0, 4))
 		optionsettings.Function = optionsettings.Function or function() end
-
-		button.MouseEnter:Connect(function()
+		local hovered = false
+		bindHoverGroup({button, bkg, label}, function()
+			hovered = true
 			tween:Tween(bkg, uipallet.TweenSmooth, {
-				BackgroundColor3 = color.Light(uipallet.Main, 0.0875)
+				BackgroundColor3 = color.Light(uipallet.Main, 0.24),
+				Size = UDim2.fromOffset(206, 31),
+				Position = UDim2.fromOffset(7, 0)
 			})
 			tween:Tween(label, uipallet.TweenSmooth, {
-				TextColor3 = uipallet.Text
+				TextColor3 = uipallet.Text,
+				BackgroundColor3 = color.Light(uipallet.Main, 0.08)
 			})
-		end)
-		button.MouseLeave:Connect(function()
+			tween:Tween(stroke, uipallet.TweenSmooth, {
+				Transparency = 0.18,
+				Thickness = 1.35
+			})
+			tween:Tween(hoverline, uipallet.TweenSmooth, {
+				BackgroundTransparency = 0.12,
+				Size = UDim2.fromOffset(4, 21)
+			})
+		end, function()
+			hovered = false
 			tween:Tween(bkg, uipallet.TweenSmooth, {
-				BackgroundColor3 = color.Light(uipallet.Main, 0.05)
+				BackgroundColor3 = color.Light(uipallet.Main, 0.05),
+				Size = UDim2.fromOffset(200, 27),
+				Position = UDim2.fromOffset(10, 2)
 			})
 			tween:Tween(label, uipallet.TweenSmooth, {
-				TextColor3 = color.Dark(uipallet.Text, 0.16)
+				TextColor3 = color.Dark(uipallet.Text, 0.16),
+				BackgroundColor3 = uipallet.Main
+			})
+			tween:Tween(stroke, uipallet.TweenSmooth, {
+				Transparency = 1,
+				Thickness = 1
+			})
+			tween:Tween(hoverline, uipallet.TweenSmooth, {
+				BackgroundTransparency = 1,
+				Size = UDim2.fromOffset(0, 19)
 			})
 		end)
 		button.MouseButton1Down:Connect(function()
 			tween:Tween(bkg, uipallet.TweenFast, {
-				Size = UDim2.fromOffset(196, 25)
+				Size = UDim2.fromOffset(198, 25),
+				Position = UDim2.fromOffset(11, 3)
 			})
 		end)
 		button.InputEnded:Connect(function(input)
 			if input.UserInputType == Enum.UserInputType.MouseButton1 then
 				tween:Tween(bkg, uipallet.TweenBounce, {
-					Size = UDim2.fromOffset(200, 27)
+					Size = UDim2.fromOffset(hovered and 206 or 200, hovered and 31 or 27),
+					Position = UDim2.fromOffset(hovered and 7 or 10, hovered and 0 or 2)
 				})
 			end
 		end)
@@ -4136,6 +4225,7 @@ function mainapi:CreateCategory(categorysettings)
 		modulebutton.BackgroundColor3 = uipallet.Main
 		modulebutton.BorderSizePixel = 0
 		modulebutton.AutoButtonColor = false
+		modulebutton.ClipsDescendants = true
 		modulebutton.Visible = not moduleapi.Hidden
 		modulebutton.Text = '            '..modulesettings.Name
 		modulebutton.TextXAlignment = Enum.TextXAlignment.Left
@@ -4143,6 +4233,21 @@ function mainapi:CreateCategory(categorysettings)
 		modulebutton.TextSize = 14
 		modulebutton.FontFace = uipallet.Font
 		modulebutton.Parent = children
+		local modulestroke = Instance.new('UIStroke')
+		modulestroke.Color = uipallet.Text
+		modulestroke.Thickness = 1
+		modulestroke.Transparency = 1
+		modulestroke.Parent = modulebutton
+		local hoverline = Instance.new('Frame')
+		hoverline.Name = 'HoverLine'
+		hoverline.AnchorPoint = Vector2.new(0, 0.5)
+		hoverline.Position = UDim2.new(0, 0, 0.5, 0)
+		hoverline.Size = UDim2.fromOffset(0, 24)
+		hoverline.BackgroundColor3 = uipallet.Text
+		hoverline.BackgroundTransparency = 1
+		hoverline.BorderSizePixel = 0
+		hoverline.Parent = modulebutton
+		addCorner(hoverline, UDim.new(1, 0))
 		local gradient = Instance.new('UIGradient')
 		gradient.Rotation = 90
 		gradient.Enabled = false
@@ -4332,7 +4437,7 @@ function mainapi:CreateCategory(categorysettings)
 			divider.Visible = self.Enabled
 			gradient.Enabled = self.Enabled
 			local targetTextColor = (hovered or modulechildren.Visible) and uipallet.Text or color.Dark(uipallet.Text, 0.16)
-			local targetBkgColor = (hovered or modulechildren.Visible) and color.Light(uipallet.Main, 0.02) or uipallet.Main
+			local targetBkgColor = hovered and color.Light(uipallet.Main, 0.16) or (modulechildren.Visible and color.Light(uipallet.Main, 0.02) or uipallet.Main)
 			local targetDotsColor = self.Enabled and Color3.fromRGB(50, 50, 50) or color.Light(uipallet.Main, 0.37)
 			tween:Tween(modulebutton, uipallet.TweenSmooth, {
 				TextColor3 = targetTextColor,
@@ -4425,26 +4530,50 @@ function mainapi:CreateCategory(categorysettings)
 		dotsbutton.MouseButton2Click:Connect(function()
 			modulechildren.Visible = not modulechildren.Visible
 		end)
-		modulebutton.MouseEnter:Connect(function()
+		bindHoverGroup({modulebutton, bind, favorite, dotsbutton, bindcover}, function()
 			hovered = true
-			if not moduleapi.Enabled and not modulechildren.Visible then
-				tween:Tween(modulebutton, uipallet.TweenSmooth, {
-					TextColor3 = uipallet.Text,
-					BackgroundColor3 = color.Light(uipallet.Main, 0.03)
-				})
-			end
+			tween:Tween(modulebutton, uipallet.TweenSmooth, {
+				TextColor3 = uipallet.Text,
+				BackgroundColor3 = moduleapi.Enabled and color.Light(uipallet.Main, 0.14) or color.Light(uipallet.Main, 0.16)
+			})
+			tween:Tween(modulestroke, uipallet.TweenSmooth, {
+				Transparency = 0.18,
+				Thickness = 1.35
+			})
+			tween:Tween(hoverline, uipallet.TweenSmooth, {
+				BackgroundTransparency = 0.08,
+				Size = UDim2.fromOffset(4, 26)
+			})
+			tween:Tween(bind, uipallet.TweenSmooth, {
+				BackgroundTransparency = 0.74
+			})
 			bind.Visible = #moduleapi.Bind > 0 or hovered or modulechildren.Visible
 			favorite.Visible = true
 			updateFavoriteVisual()
-		end)
-		modulebutton.MouseLeave:Connect(function()
+		end, function()
 			hovered = false
 			if not moduleapi.Enabled and not modulechildren.Visible then
 				tween:Tween(modulebutton, uipallet.TweenSmooth, {
 					TextColor3 = color.Dark(uipallet.Text, 0.16),
 					BackgroundColor3 = uipallet.Main
 				})
+			else
+				tween:Tween(modulebutton, uipallet.TweenSmooth, {
+					TextColor3 = uipallet.Text,
+					BackgroundColor3 = color.Light(uipallet.Main, 0.02)
+				})
 			end
+			tween:Tween(modulestroke, uipallet.TweenSmooth, {
+				Transparency = 1,
+				Thickness = 1
+			})
+			tween:Tween(hoverline, uipallet.TweenSmooth, {
+				BackgroundTransparency = 1,
+				Size = UDim2.fromOffset(0, 24)
+			})
+			tween:Tween(bind, uipallet.TweenSmooth, {
+				BackgroundTransparency = 0.92
+			})
 			bind.Visible = #moduleapi.Bind > 0 or hovered or modulechildren.Visible
 			favorite.Visible = favoriteHovered or moduleapi.Favorited
 			updateFavoriteVisual()
