@@ -20,15 +20,15 @@ if not getgenv().debug then getgenv().debug = {traceback = function(s) return s 
 
 -- Folder setup
 for _, folder in ipairs({
-    'vape', 'vape/profiles', 'vape/assets',
-    'vape/libraries', 'vape/Libraries'
+    'pealzware', 'pealzware/profiles', 'pealzware/assets',
+    'pealzware/libraries', 'pealzware/Libraries'
 }) do
     if not isfolder(folder) then makefolder(folder) end
 end
 
 pcall(function()
-    if not isfile('vape/profiles/gui.txt') then
-        writefile('vape/profiles/gui.txt', 'new')
+    if not isfile('pealzware/profiles/gui.txt') then
+        writefile('pealzware/profiles/gui.txt', 'new')
     end
 end)
 
@@ -96,7 +96,7 @@ end)
 shared.VapeDeveloper = shared.VapeDeveloper or shared.PealzDev
 
 -- Profile installation
-local baseDirectory = "vape/"
+local baseDirectory = "pealzware/"
 local function installProfiles()
     local profileApiUrl = "https://api.github.com/repos/1AreYouMental110/pealzware/contents/profiles?ref=main"
     local profileRawBaseUrl = "https://raw.githubusercontent.com/1AreYouMental110/pealzware/main/profiles/"
@@ -130,10 +130,6 @@ end
 if not isfile(baseDirectory..'libraries/profilesinstalled5.txt') then
     pcall(installProfiles)
 end
-
-pcall(function()
-    if not isfile("vape/assetversion.txt") then writefile("vape/assetversion.txt", "") end
-end)
 
 -- Core file loader -- fetches from pealzware repo
 local function vapeGithubRequest(scripturl, isImportant)
@@ -195,8 +191,6 @@ local function pload(fileName, isImportant, required)
 end
 shared.pload = pload
 getgenv().pload = pload
-
-writefile(baseDirectory.."commithash2.txt", "main")
 
 -- Load the main script
 return pload('main.lua', true)

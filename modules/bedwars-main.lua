@@ -48,7 +48,7 @@ end
 local function downloadFile(path, func)
 	if not isfile(path) then
 		local suc, res = pcall(function()
-			return game:HttpGet('https://raw.githubusercontent.com/1AreYouMental110/pealzware/main/'..select(1, path:gsub('vape/', '')), true)
+			return game:HttpGet('https://raw.githubusercontent.com/1AreYouMental110/pealzware/main/'..select(1, path:gsub('pealzware/', '')), true)
 		end)
 		if not suc or res == '404: Not Found' then
 			error(res)
@@ -99,68 +99,68 @@ local targetinfo = vape.Libraries.targetinfo
 local getfontsize = vape.Libraries.getfontsize
 
 local getcustomassets = {
-	['vape/assets/new/add.png'] = 'rbxassetid://14368300605',
-	['vape/assets/new/alert.png'] = 'rbxassetid://14368301329',
-	['vape/assets/new/allowedicon.png'] = 'rbxassetid://14368302000',
-	['vape/assets/new/allowedtab.png'] = 'rbxassetid://14368302875',
-	['vape/assets/new/arrowmodule.png'] = 'rbxassetid://14473354880',
-	['vape/assets/new/back.png'] = 'rbxassetid://14368303894',
-	['vape/assets/new/bind.png'] = 'rbxassetid://14368304734',
-	['vape/assets/new/bindbkg.png'] = 'rbxassetid://14368305655',
-	['vape/assets/new/blatanticon.png'] = 'rbxassetid://14368306745',
-	['vape/assets/new/blockedicon.png'] = 'rbxassetid://14385669108',
-	['vape/assets/new/blockedtab.png'] = 'rbxassetid://14385672881',
-	['vape/assets/new/blur.png'] = 'rbxassetid://14898786664',
-	['vape/assets/new/blurnotif.png'] = 'rbxassetid://16738720137',
-	['vape/assets/new/close.png'] = 'rbxassetid://14368309446',
-	['vape/assets/new/closemini.png'] = 'rbxassetid://14368310467',
-	['vape/assets/new/colorpreview.png'] = 'rbxassetid://14368311578',
-	['vape/assets/new/combaticon.png'] = 'rbxassetid://14368312652',
-	['vape/assets/new/customsettings.png'] = 'rbxassetid://14403726449',
-	['vape/assets/new/dots.png'] = 'rbxassetid://14368314459',
-	['vape/assets/new/edit.png'] = 'rbxassetid://14368315443',
-	['vape/assets/new/expandright.png'] = 'rbxassetid://14368316544',
-	['vape/assets/new/expandup.png'] = 'rbxassetid://14368317595',
-	['vape/assets/new/friendstab.png'] = 'rbxassetid://14397462778',
-	['vape/assets/new/guisettings.png'] = 'rbxassetid://14368318994',
-	['vape/assets/new/guislider.png'] = 'rbxassetid://14368320020',
-	['vape/assets/new/guisliderrain.png'] = 'rbxassetid://14368321228',
-	['vape/assets/new/guiv4.png'] = 'rbxassetid://14368322199',
-	['vape/assets/new/guivape.png'] = 'rbxassetid://14657521312',
-	['vape/assets/new/info.png'] = 'rbxassetid://14368324807',
-	['vape/assets/new/inventoryicon.png'] = 'rbxassetid://14928011633',
-	['vape/assets/new/legit.png'] = 'rbxassetid://14425650534',
-	['vape/assets/new/legittab.png'] = 'rbxassetid://14426740825',
-	['vape/assets/new/miniicon.png'] = 'rbxassetid://14368326029',
-	['vape/assets/new/notification.png'] = 'rbxassetid://16738721069',
-	['vape/assets/new/overlaysicon.png'] = 'rbxassetid://14368339581',
-	['vape/assets/new/overlaystab.png'] = 'rbxassetid://14397380433',
-	['vape/assets/new/pin.png'] = 'rbxassetid://14368342301',
-	['vape/assets/new/profilesicon.png'] = 'rbxassetid://14397465323',
-	['vape/assets/new/radaricon.png'] = 'rbxassetid://14368343291',
-	['vape/assets/new/rainbow_1.png'] = 'rbxassetid://14368344374',
-	['vape/assets/new/rainbow_2.png'] = 'rbxassetid://14368345149',
-	['vape/assets/new/rainbow_3.png'] = 'rbxassetid://14368345840',
-	['vape/assets/new/rainbow_4.png'] = 'rbxassetid://14368346696',
-	['vape/assets/new/range.png'] = 'rbxassetid://14368347435',
-	['vape/assets/new/rangearrow.png'] = 'rbxassetid://14368348640',
-	['vape/assets/new/rendericon.png'] = 'rbxassetid://14368350193',
-	['vape/assets/new/rendertab.png'] = 'rbxassetid://14397373458',
-	['vape/assets/new/search.png'] = 'rbxassetid://14425646684',
-	['vape/assets/new/expandicon.png'] = 'rbxassetid://14368353032',
-	['vape/assets/new/targetinfoicon.png'] = 'rbxassetid://14368354234',
-	['vape/assets/new/targetnpc1.png'] = 'rbxassetid://14497400332',
-	['vape/assets/new/targetnpc2.png'] = 'rbxassetid://14497402744',
-	['vape/assets/new/targetplayers1.png'] = 'rbxassetid://14497396015',
-	['vape/assets/new/targetplayers2.png'] = 'rbxassetid://14497397862',
-	['vape/assets/new/targetstab.png'] = 'rbxassetid://14497393895',
-	['vape/assets/new/textguiicon.png'] = 'rbxassetid://14368355456',
-	['vape/assets/new/textv4.png'] = 'rbxassetid://14368357095',
-	['vape/assets/new/textvape.png'] = 'rbxassetid://14368358200',
-	['vape/assets/new/utilityicon.png'] = 'rbxassetid://14368359107',
-	['vape/assets/new/vape.png'] = 'rbxassetid://14373395239',
-	['vape/assets/new/warning.png'] = 'rbxassetid://14368361552',
-	['vape/assets/new/worldicon.png'] = 'rbxassetid://14368362492'
+	['pealzware/assets/new/add.png'] = 'rbxassetid://14368300605',
+	['pealzware/assets/new/alert.png'] = 'rbxassetid://14368301329',
+	['pealzware/assets/new/allowedicon.png'] = 'rbxassetid://14368302000',
+	['pealzware/assets/new/allowedtab.png'] = 'rbxassetid://14368302875',
+	['pealzware/assets/new/arrowmodule.png'] = 'rbxassetid://14473354880',
+	['pealzware/assets/new/back.png'] = 'rbxassetid://14368303894',
+	['pealzware/assets/new/bind.png'] = 'rbxassetid://14368304734',
+	['pealzware/assets/new/bindbkg.png'] = 'rbxassetid://14368305655',
+	['pealzware/assets/new/blatanticon.png'] = 'rbxassetid://14368306745',
+	['pealzware/assets/new/blockedicon.png'] = 'rbxassetid://14385669108',
+	['pealzware/assets/new/blockedtab.png'] = 'rbxassetid://14385672881',
+	['pealzware/assets/new/blur.png'] = 'rbxassetid://14898786664',
+	['pealzware/assets/new/blurnotif.png'] = 'rbxassetid://16738720137',
+	['pealzware/assets/new/close.png'] = 'rbxassetid://14368309446',
+	['pealzware/assets/new/closemini.png'] = 'rbxassetid://14368310467',
+	['pealzware/assets/new/colorpreview.png'] = 'rbxassetid://14368311578',
+	['pealzware/assets/new/combaticon.png'] = 'rbxassetid://14368312652',
+	['pealzware/assets/new/customsettings.png'] = 'rbxassetid://14403726449',
+	['pealzware/assets/new/dots.png'] = 'rbxassetid://14368314459',
+	['pealzware/assets/new/edit.png'] = 'rbxassetid://14368315443',
+	['pealzware/assets/new/expandright.png'] = 'rbxassetid://14368316544',
+	['pealzware/assets/new/expandup.png'] = 'rbxassetid://14368317595',
+	['pealzware/assets/new/friendstab.png'] = 'rbxassetid://14397462778',
+	['pealzware/assets/new/guisettings.png'] = 'rbxassetid://14368318994',
+	['pealzware/assets/new/guislider.png'] = 'rbxassetid://14368320020',
+	['pealzware/assets/new/guisliderrain.png'] = 'rbxassetid://14368321228',
+	['pealzware/assets/new/guiv4.png'] = 'rbxassetid://14368322199',
+	['pealzware/assets/new/guivape.png'] = 'rbxassetid://14657521312',
+	['pealzware/assets/new/info.png'] = 'rbxassetid://14368324807',
+	['pealzware/assets/new/inventoryicon.png'] = 'rbxassetid://14928011633',
+	['pealzware/assets/new/legit.png'] = 'rbxassetid://14425650534',
+	['pealzware/assets/new/legittab.png'] = 'rbxassetid://14426740825',
+	['pealzware/assets/new/miniicon.png'] = 'rbxassetid://14368326029',
+	['pealzware/assets/new/notification.png'] = 'rbxassetid://16738721069',
+	['pealzware/assets/new/overlaysicon.png'] = 'rbxassetid://14368339581',
+	['pealzware/assets/new/overlaystab.png'] = 'rbxassetid://14397380433',
+	['pealzware/assets/new/pin.png'] = 'rbxassetid://14368342301',
+	['pealzware/assets/new/profilesicon.png'] = 'rbxassetid://14397465323',
+	['pealzware/assets/new/radaricon.png'] = 'rbxassetid://14368343291',
+	['pealzware/assets/new/rainbow_1.png'] = 'rbxassetid://14368344374',
+	['pealzware/assets/new/rainbow_2.png'] = 'rbxassetid://14368345149',
+	['pealzware/assets/new/rainbow_3.png'] = 'rbxassetid://14368345840',
+	['pealzware/assets/new/rainbow_4.png'] = 'rbxassetid://14368346696',
+	['pealzware/assets/new/range.png'] = 'rbxassetid://14368347435',
+	['pealzware/assets/new/rangearrow.png'] = 'rbxassetid://14368348640',
+	['pealzware/assets/new/rendericon.png'] = 'rbxassetid://14368350193',
+	['pealzware/assets/new/rendertab.png'] = 'rbxassetid://14397373458',
+	['pealzware/assets/new/search.png'] = 'rbxassetid://14425646684',
+	['pealzware/assets/new/expandicon.png'] = 'rbxassetid://14368353032',
+	['pealzware/assets/new/targetinfoicon.png'] = 'rbxassetid://14368354234',
+	['pealzware/assets/new/targetnpc1.png'] = 'rbxassetid://14497400332',
+	['pealzware/assets/new/targetnpc2.png'] = 'rbxassetid://14497402744',
+	['pealzware/assets/new/targetplayers1.png'] = 'rbxassetid://14497396015',
+	['pealzware/assets/new/targetplayers2.png'] = 'rbxassetid://14497397862',
+	['pealzware/assets/new/targetstab.png'] = 'rbxassetid://14497393895',
+	['pealzware/assets/new/textguiicon.png'] = 'rbxassetid://14368355456',
+	['pealzware/assets/new/textv4.png'] = 'rbxassetid://14368357095',
+	['pealzware/assets/new/textvape.png'] = 'rbxassetid://14368358200',
+	['pealzware/assets/new/utilityicon.png'] = 'rbxassetid://14368359107',
+	['pealzware/assets/new/vape.png'] = 'rbxassetid://14373395239',
+	['pealzware/assets/new/warning.png'] = 'rbxassetid://14368361552',
+	['pealzware/assets/new/worldicon.png'] = 'rbxassetid://14368362492'
 }
 
 local getcustomasset = function(path)
@@ -177,7 +177,7 @@ local function addBlur(parent)
 	blur.Size = UDim2.new(1, 89, 1, 52)
 	blur.Position = UDim2.fromOffset(-48, -31)
 	blur.BackgroundTransparency = 1
-	blur.Image = getcustomasset('vape/assets/new/blur.png')
+	blur.Image = getcustomasset('pealzware/assets/new/blur.png')
 	blur.ScaleType = Enum.ScaleType.Slice
 	blur.SliceCenter = Rect.new(52, 31, 261, 502)
 	blur.Parent = parent
@@ -827,7 +827,7 @@ run(function()
 
 		if not first or whitelist.textdata ~= whitelist.olddata then -- Just because pealzware wont auto update on new vape whitelist change on the repeated :update function doesn't mean your whitelist won't work xylex
 			if not first then
-				whitelist.olddata = isfile('vape/profiles/whitelist.json') and readfile('vape/profiles/whitelist.json') or nil
+				whitelist.olddata = isfile('pealzware/profiles/whitelist.json') and readfile('pealzware/profiles/whitelist.json') or nil
 			end
 			--whitelist.data = pDecode(whitelist.textdata) or whitelist.data
 			if suc then
@@ -868,7 +868,7 @@ run(function()
 			if whitelist.textdata ~= whitelist.olddata then
 				whitelist.olddata = whitelist.textdata
 				pcall(function()
-					writefile('vape/profiles/whitelist.json', whitelist.textdata)
+					writefile('pealzware/profiles/whitelist.json', whitelist.textdata)
 				end)
 			end
 
@@ -3984,7 +3984,7 @@ run(function()
 		EntityArrow.BackgroundTransparency = 1
 		EntityArrow.BorderSizePixel = 0
 		EntityArrow.Visible = false
-		EntityArrow.Image = getcustomasset('vape/assets/new/arrowmodule.png')
+		EntityArrow.Image = getcustomasset('pealzware/assets/new/arrowmodule.png')
 		EntityArrow.ImageColor3 = entitylib.getEntityColor(ent) or Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
 		EntityArrow.Parent = Folder
 		Reference[ent] = EntityArrow
@@ -4878,12 +4878,12 @@ run(function()
 					chair.Material = Enum.Material.SmoothPlastic
 					chair.Parent = game.Workspace
 					movingsound = Instance.new('Sound')
-					--movingsound.SoundId = downloadVapeAsset('vape/assets/ChairRolling.mp3')
+					--movingsound.SoundId = downloadVapeAsset('pealzware/assets/ChairRolling.mp3')
 					movingsound.Volume = 0.4
 					movingsound.Looped = true
 					movingsound.Parent = game.Workspace
 					flyingsound = Instance.new('Sound')
-					--flyingsound.SoundId = downloadVapeAsset('vape/assets/ChairFlying.mp3')
+					--flyingsound.SoundId = downloadVapeAsset('pealzware/assets/ChairFlying.mp3')
 					flyingsound.Volume = 0.4
 					flyingsound.Looped = true
 					flyingsound.Parent = game.Workspace
@@ -5694,7 +5694,7 @@ run(function()
 
 	Radar = vape:CreateOverlay({
 		Name = 'Radar',
-		Icon = getcustomasset('vape/assets/new/radaricon.png'),
+		Icon = getcustomasset('pealzware/assets/new/radaricon.png'),
 		Size = UDim2.fromOffset(14, 14),
 		Position = UDim2.fromOffset(12, 13),
 		Function = function(callback)
@@ -5911,7 +5911,7 @@ run(function()
 
 	SessionInfo = vape:CreateOverlay({
 		Name = 'Session Info',
-		Icon = getcustomasset('vape/assets/new/textguiicon.png'),
+		Icon = getcustomasset('pealzware/assets/new/textguiicon.png'),
 		Size = UDim2.fromOffset(16, 12),
 		Position = UDim2.fromOffset(12, 14),
 		Function = function(callback)
@@ -8542,7 +8542,7 @@ local getfontsize = vape.Libraries.getfontsize
 local getcustomasset = vape.Libraries.getcustomasset
 local entityLibrary = entitylib
 
-local baseDirectory = "vape/"
+local baseDirectory = "pealzware/"
 
 local runService = game:GetService("RunService")
 local RunService = runService
@@ -12175,68 +12175,68 @@ local whitelist = vape.Libraries.whitelist
 local prediction = vape.Libraries.prediction
 local getfontsize = vape.Libraries.getfontsize
 local getcustomassets = {
-	['vape/assets/new/add.png'] = 'rbxassetid://14368300605',
-	['vape/assets/new/alert.png'] = 'rbxassetid://14368301329',
-	['vape/assets/new/allowedicon.png'] = 'rbxassetid://14368302000',
-	['vape/assets/new/allowedtab.png'] = 'rbxassetid://14368302875',
-	['vape/assets/new/arrowmodule.png'] = 'rbxassetid://14473354880',
-	['vape/assets/new/back.png'] = 'rbxassetid://14368303894',
-	['vape/assets/new/bind.png'] = 'rbxassetid://14368304734',
-	['vape/assets/new/bindbkg.png'] = 'rbxassetid://14368305655',
-	['vape/assets/new/blatanticon.png'] = 'rbxassetid://14368306745',
-	['vape/assets/new/blockedicon.png'] = 'rbxassetid://14385669108',
-	['vape/assets/new/blockedtab.png'] = 'rbxassetid://14385672881',
-	['vape/assets/new/blur.png'] = 'rbxassetid://14898786664',
-	['vape/assets/new/blurnotif.png'] = 'rbxassetid://16738720137',
-	['vape/assets/new/close.png'] = 'rbxassetid://14368309446',
-	['vape/assets/new/closemini.png'] = 'rbxassetid://14368310467',
-	['vape/assets/new/colorpreview.png'] = 'rbxassetid://14368311578',
-	['vape/assets/new/combaticon.png'] = 'rbxassetid://14368312652',
-	['vape/assets/new/customsettings.png'] = 'rbxassetid://14403726449',
-	['vape/assets/new/dots.png'] = 'rbxassetid://14368314459',
-	['vape/assets/new/edit.png'] = 'rbxassetid://14368315443',
-	['vape/assets/new/expandright.png'] = 'rbxassetid://14368316544',
-	['vape/assets/new/expandup.png'] = 'rbxassetid://14368317595',
-	['vape/assets/new/friendstab.png'] = 'rbxassetid://14397462778',
-	['vape/assets/new/guisettings.png'] = 'rbxassetid://14368318994',
-	['vape/assets/new/guislider.png'] = 'rbxassetid://14368320020',
-	['vape/assets/new/guisliderrain.png'] = 'rbxassetid://14368321228',
-	['vape/assets/new/guiv4.png'] = 'rbxassetid://14368322199',
-	['vape/assets/new/guivape.png'] = 'rbxassetid://14657521312',
-	['vape/assets/new/info.png'] = 'rbxassetid://14368324807',
-	['vape/assets/new/inventoryicon.png'] = 'rbxassetid://14928011633',
-	['vape/assets/new/legit.png'] = 'rbxassetid://14425650534',
-	['vape/assets/new/legittab.png'] = 'rbxassetid://14426740825',
-	['vape/assets/new/miniicon.png'] = 'rbxassetid://14368326029',
-	['vape/assets/new/notification.png'] = 'rbxassetid://16738721069',
-	['vape/assets/new/overlaysicon.png'] = 'rbxassetid://14368339581',
-	['vape/assets/new/overlaystab.png'] = 'rbxassetid://14397380433',
-	['vape/assets/new/pin.png'] = 'rbxassetid://14368342301',
-	['vape/assets/new/profilesicon.png'] = 'rbxassetid://14397465323',
-	['vape/assets/new/radaricon.png'] = 'rbxassetid://14368343291',
-	['vape/assets/new/rainbow_1.png'] = 'rbxassetid://14368344374',
-	['vape/assets/new/rainbow_2.png'] = 'rbxassetid://14368345149',
-	['vape/assets/new/rainbow_3.png'] = 'rbxassetid://14368345840',
-	['vape/assets/new/rainbow_4.png'] = 'rbxassetid://14368346696',
-	['vape/assets/new/range.png'] = 'rbxassetid://14368347435',
-	['vape/assets/new/rangearrow.png'] = 'rbxassetid://14368348640',
-	['vape/assets/new/rendericon.png'] = 'rbxassetid://14368350193',
-	['vape/assets/new/rendertab.png'] = 'rbxassetid://14397373458',
-	['vape/assets/new/search.png'] = 'rbxassetid://14425646684',
-	['vape/assets/new/expandicon.png'] = 'rbxassetid://14368353032',
-	['vape/assets/new/targetinfoicon.png'] = 'rbxassetid://14368354234',
-	['vape/assets/new/targetnpc1.png'] = 'rbxassetid://14497400332',
-	['vape/assets/new/targetnpc2.png'] = 'rbxassetid://14497402744',
-	['vape/assets/new/targetplayers1.png'] = 'rbxassetid://14497396015',
-	['vape/assets/new/targetplayers2.png'] = 'rbxassetid://14497397862',
-	['vape/assets/new/targetstab.png'] = 'rbxassetid://14497393895',
-	['vape/assets/new/textguiicon.png'] = 'rbxassetid://14368355456',
-	['vape/assets/new/textv4.png'] = 'rbxassetid://14368357095',
-	['vape/assets/new/textvape.png'] = 'rbxassetid://14368358200',
-	['vape/assets/new/utilityicon.png'] = 'rbxassetid://14368359107',
-	['vape/assets/new/vape.png'] = 'rbxassetid://14373395239',
-	['vape/assets/new/warning.png'] = 'rbxassetid://14368361552',
-	['vape/assets/new/worldicon.png'] = 'rbxassetid://14368362492'
+	['pealzware/assets/new/add.png'] = 'rbxassetid://14368300605',
+	['pealzware/assets/new/alert.png'] = 'rbxassetid://14368301329',
+	['pealzware/assets/new/allowedicon.png'] = 'rbxassetid://14368302000',
+	['pealzware/assets/new/allowedtab.png'] = 'rbxassetid://14368302875',
+	['pealzware/assets/new/arrowmodule.png'] = 'rbxassetid://14473354880',
+	['pealzware/assets/new/back.png'] = 'rbxassetid://14368303894',
+	['pealzware/assets/new/bind.png'] = 'rbxassetid://14368304734',
+	['pealzware/assets/new/bindbkg.png'] = 'rbxassetid://14368305655',
+	['pealzware/assets/new/blatanticon.png'] = 'rbxassetid://14368306745',
+	['pealzware/assets/new/blockedicon.png'] = 'rbxassetid://14385669108',
+	['pealzware/assets/new/blockedtab.png'] = 'rbxassetid://14385672881',
+	['pealzware/assets/new/blur.png'] = 'rbxassetid://14898786664',
+	['pealzware/assets/new/blurnotif.png'] = 'rbxassetid://16738720137',
+	['pealzware/assets/new/close.png'] = 'rbxassetid://14368309446',
+	['pealzware/assets/new/closemini.png'] = 'rbxassetid://14368310467',
+	['pealzware/assets/new/colorpreview.png'] = 'rbxassetid://14368311578',
+	['pealzware/assets/new/combaticon.png'] = 'rbxassetid://14368312652',
+	['pealzware/assets/new/customsettings.png'] = 'rbxassetid://14403726449',
+	['pealzware/assets/new/dots.png'] = 'rbxassetid://14368314459',
+	['pealzware/assets/new/edit.png'] = 'rbxassetid://14368315443',
+	['pealzware/assets/new/expandright.png'] = 'rbxassetid://14368316544',
+	['pealzware/assets/new/expandup.png'] = 'rbxassetid://14368317595',
+	['pealzware/assets/new/friendstab.png'] = 'rbxassetid://14397462778',
+	['pealzware/assets/new/guisettings.png'] = 'rbxassetid://14368318994',
+	['pealzware/assets/new/guislider.png'] = 'rbxassetid://14368320020',
+	['pealzware/assets/new/guisliderrain.png'] = 'rbxassetid://14368321228',
+	['pealzware/assets/new/guiv4.png'] = 'rbxassetid://14368322199',
+	['pealzware/assets/new/guivape.png'] = 'rbxassetid://14657521312',
+	['pealzware/assets/new/info.png'] = 'rbxassetid://14368324807',
+	['pealzware/assets/new/inventoryicon.png'] = 'rbxassetid://14928011633',
+	['pealzware/assets/new/legit.png'] = 'rbxassetid://14425650534',
+	['pealzware/assets/new/legittab.png'] = 'rbxassetid://14426740825',
+	['pealzware/assets/new/miniicon.png'] = 'rbxassetid://14368326029',
+	['pealzware/assets/new/notification.png'] = 'rbxassetid://16738721069',
+	['pealzware/assets/new/overlaysicon.png'] = 'rbxassetid://14368339581',
+	['pealzware/assets/new/overlaystab.png'] = 'rbxassetid://14397380433',
+	['pealzware/assets/new/pin.png'] = 'rbxassetid://14368342301',
+	['pealzware/assets/new/profilesicon.png'] = 'rbxassetid://14397465323',
+	['pealzware/assets/new/radaricon.png'] = 'rbxassetid://14368343291',
+	['pealzware/assets/new/rainbow_1.png'] = 'rbxassetid://14368344374',
+	['pealzware/assets/new/rainbow_2.png'] = 'rbxassetid://14368345149',
+	['pealzware/assets/new/rainbow_3.png'] = 'rbxassetid://14368345840',
+	['pealzware/assets/new/rainbow_4.png'] = 'rbxassetid://14368346696',
+	['pealzware/assets/new/range.png'] = 'rbxassetid://14368347435',
+	['pealzware/assets/new/rangearrow.png'] = 'rbxassetid://14368348640',
+	['pealzware/assets/new/rendericon.png'] = 'rbxassetid://14368350193',
+	['pealzware/assets/new/rendertab.png'] = 'rbxassetid://14397373458',
+	['pealzware/assets/new/search.png'] = 'rbxassetid://14425646684',
+	['pealzware/assets/new/expandicon.png'] = 'rbxassetid://14368353032',
+	['pealzware/assets/new/targetinfoicon.png'] = 'rbxassetid://14368354234',
+	['pealzware/assets/new/targetnpc1.png'] = 'rbxassetid://14497400332',
+	['pealzware/assets/new/targetnpc2.png'] = 'rbxassetid://14497402744',
+	['pealzware/assets/new/targetplayers1.png'] = 'rbxassetid://14497396015',
+	['pealzware/assets/new/targetplayers2.png'] = 'rbxassetid://14497397862',
+	['pealzware/assets/new/targetstab.png'] = 'rbxassetid://14497393895',
+	['pealzware/assets/new/textguiicon.png'] = 'rbxassetid://14368355456',
+	['pealzware/assets/new/textv4.png'] = 'rbxassetid://14368357095',
+	['pealzware/assets/new/textvape.png'] = 'rbxassetid://14368358200',
+	['pealzware/assets/new/utilityicon.png'] = 'rbxassetid://14368359107',
+	['pealzware/assets/new/vape.png'] = 'rbxassetid://14373395239',
+	['pealzware/assets/new/warning.png'] = 'rbxassetid://14368361552',
+	['pealzware/assets/new/worldicon.png'] = 'rbxassetid://14368362492'
 }
 local getcustomasset = function(path)
 	return getcustomassets[path] or ""
@@ -12276,7 +12276,7 @@ local function addBlur(parent)
 	blur.Size = UDim2.new(1, 89, 1, 52)
 	blur.Position = UDim2.fromOffset(-48, -31)
 	blur.BackgroundTransparency = 1
-	blur.Image = getcustomasset('vape/assets/new/blur.png')
+	blur.Image = getcustomasset('pealzware/assets/new/blur.png')
 	blur.ScaleType = Enum.ScaleType.Slice
 	blur.SliceCenter = Rect.new(52, 31, 261, 502)
 	blur.Parent = parent
@@ -21289,7 +21289,7 @@ run(function()
 		close.Position = UDim2.new(1, -35, 0, 9)
 		close.BackgroundColor3 = Color3.new(1, 1, 1)
 		close.BackgroundTransparency = 1
-		close.Image = getcustomasset('vape/assets/new/close.png')
+		close.Image = getcustomasset('pealzware/assets/new/close.png')
 		close.ImageColor3 = color.Light(uipallet.Text, 0.2)
 		close.ImageTransparency = 0.5
 		close.AutoButtonColor = false
@@ -21403,7 +21403,7 @@ run(function()
 		searchicon.Size = UDim2.fromOffset(14, 14)
 		searchicon.Position = UDim2.new(1, -26, 0, 8)
 		searchicon.BackgroundTransparency = 1
-		searchicon.Image = getcustomasset('vape/assets/new/search.png')
+		searchicon.Image = getcustomasset('pealzware/assets/new/search.png')
 		searchicon.ImageColor3 = color.Light(uipallet.Main, 0.37)
 		searchicon.Parent = searchbkg
 		local children = Instance.new('ScrollingFrame')
@@ -21544,7 +21544,7 @@ run(function()
 		textbuttonicon.Position = UDim2.fromScale(0.5, 0.5)
 		textbuttonicon.AnchorPoint = Vector2.new(0.5, 0.5)
 		textbuttonicon.BackgroundTransparency = 1
-		textbuttonicon.Image = getcustomasset('vape/assets/new/add.png')
+		textbuttonicon.Image = getcustomasset('pealzware/assets/new/add.png')
 		textbuttonicon.ImageColor3 = Color3.fromHSV(0.46, 0.96, 0.52)
 		textbuttonicon.Parent = textbutton
 		local childrenlist = Instance.new('Frame')
@@ -21637,7 +21637,7 @@ run(function()
 			close.Position = UDim2.new(1, -23, 0, 6)
 			close.BackgroundColor3 = Color3.new(1, 1, 1)
 			close.BackgroundTransparency = 1
-			close.Image = getcustomasset('vape/assets/new/closemini.png')
+			close.Image = getcustomasset('pealzware/assets/new/closemini.png')
 			close.ImageColor3 = color.Light(uipallet.Text, 0.2)
 			close.ImageTransparency = 0.5
 			close.AutoButtonColor = false
@@ -22140,7 +22140,7 @@ run(function()
 						Size = UDim2.new(1, 89, 1, 52),
 						Position = UDim2.fromOffset(-48, -31),
 						BackgroundTransparency = 1,
-						Image = getcustomasset('vape/assets/new/blur.png'),
+						Image = getcustomasset('pealzware/assets/new/blur.png'),
 						ScaleType = Enum.ScaleType.Slice,
 						SliceCenter = Rect.new(52, 31, 261, 502)
 					}),
@@ -25384,14 +25384,14 @@ local worldtoviewportpoint = function(pos)
 end
 
 local function vapeGithubRequest(scripturl)
-	if not isfile("vape/"..scripturl) then
-		local suc, res = pcall(function() return game:HttpGet("https://raw.githubusercontent.com/1AreYouMental110/pealzware/"..readfile("vape/commithash.txt").."/"..scripturl, true) end)
+	if not isfile("pealzware/"..scripturl) then
+		local suc, res = pcall(function() return game:HttpGet("https://raw.githubusercontent.com/1AreYouMental110/pealzware/main/"..scripturl, true) end)
 		assert(suc, res)
 		assert(res ~= "404: Not Found", res)
 		if scripturl:find(".lua") then res = "--This watermark is used to delete the file if its cached, remove it to make the file persist after commits.\n"..res end
-		writefile("vape/"..scripturl, res)
+		writefile("pealzware/"..scripturl, res)
 	end
-	return readfile("vape/"..scripturl)
+	return readfile("pealzware/"..scripturl)
 end
 
 local function downloadVapeAsset(path)
@@ -25410,7 +25410,7 @@ local function downloadVapeAsset(path)
 			task.wait(0.1)
 			textlabel:Destroy()
 		end)
-		local suc, req = pcall(function() return vapeGithubRequest(path:gsub("vape/assets", "assets")) end)
+		local suc, req = pcall(function() return vapeGithubRequest(path:gsub("pealzware/assets", "assets")) end)
 		if suc and req then
 			writefile(path, req)
 		else
@@ -38138,7 +38138,7 @@ pcall(function()
 		DetectionUtils = {
 			saveStaffRecord = function(player, detectionMethod)
 				local success, data = pcall(function()
-					return HttpService:JSONDecode(readfile('vape/Libraries/StaffData.json') or '[]')
+					return HttpService:JSONDecode(readfile('pealzware/Libraries/StaffData.json') or '[]')
 				end)
 
 				data = success and data or {}
@@ -38148,11 +38148,11 @@ pcall(function()
 					DetectionMethod = detectionMethod
 				})
 
-				if not isfolder('vape/Libraries') then
-					makefolder('vape/Libraries')
+				if not isfolder('pealzware/Libraries') then
+					makefolder('pealzware/Libraries')
 				end
 				pcall(function()
-					writefile('vape/Libraries/StaffData.json', HttpService:JSONEncode(data))
+					writefile('pealzware/Libraries/StaffData.json', HttpService:JSONEncode(data))
 				end)
 			end,
 

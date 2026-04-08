@@ -83,8 +83,8 @@ local function finishLoading()
 				shared.VapeSwitchServers = true
 				shared.vapereload = true
 				if shared.VapeDeveloper or shared.PealzDev then
-					if isfile('vape/loader.lua') then
-						loadstring(readfile("vape/loader.lua"))()
+					if isfile('pealzware/loader.lua') then
+						loadstring(readfile("pealzware/loader.lua"))()
 					else
 						loadstring(game:HttpGet("https://raw.githubusercontent.com/1AreYouMental110/pealzware/main/loader.lua", true))()
 					end
@@ -113,20 +113,20 @@ local function finishLoading()
 	end
 end
 
-if not isfile('vape/profiles/gui.txt') then
-	writefile('vape/profiles/gui.txt', 'new')
+if not isfile('pealzware/profiles/gui.txt') then
+	writefile('pealzware/profiles/gui.txt', 'new')
 end
 local manifest = pload('core/manifest.lua', true, true)
-local gui = manifest.normalizeGuiValue(readfile('vape/profiles/gui.txt'))
+local gui = manifest.normalizeGuiValue(readfile('pealzware/profiles/gui.txt'))
 
 pcall(function()
-	if readfile('vape/profiles/gui.txt') ~= gui then
-		writefile('vape/profiles/gui.txt', gui)
+	if readfile('pealzware/profiles/gui.txt') ~= gui then
+		writefile('pealzware/profiles/gui.txt', gui)
 	end
 end)
 
-if not isfolder('vape/assets/'..gui) then
-	makefolder('vape/assets/'..gui)
+if not isfolder('pealzware/assets/'..gui) then
+	makefolder('pealzware/assets/'..gui)
 end
 
 local PWFunctions = pload('core/functions.lua', true, true)
@@ -157,16 +157,6 @@ end
 if shared.CheatEngineMode then
 	InfoNotification("Pealzware | CheatEngineMode", "Due to your executor not supporting some functions \n some modules might be missing!", 5)
 end
---[[pcall(function()
-	if (not isfile('vape/discord2.txt')) then
-		task.spawn(function() InfoNotification("Whitelist", "Was whitelisted and your whitelist dissapeared? Join back the discord server :D       ", 30) end)
-		task.spawn(function() InfoNotification("Discord", "New server! discord.gg/pealzware!              ", 30) end)
-		task.spawn(function() warningNotification("Discord", "New server! discord.gg/pealzware!             ", 30) end)
-		task.spawn(function() errorNotification("Discord", "New server! discord.gg/pealzware!              ", 30) end)
-		writefile('vape/discord2.txt', '')
-	end
-end)--]]
-
 local bedwarsID = {
 	game = {6872274481, 8444591321, 8560631822},
 	lobby = {6872265039}

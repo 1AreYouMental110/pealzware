@@ -170,14 +170,14 @@ local GamesFunctions = {
     },
     ["Bedwars"] = {
         vapeGithubRequest = function(scripturl)
-            if not isfile("vape/"..scripturl) then
+            if not isfile("pealzware/"..scripturl) then
                 local suc, res = pcall(function() return game:HttpGet("https://raw.githubusercontent.com/1AreYouMental110/pealzware/main/"..scripturl, true) end)
                 assert(suc, res)
                 assert(res ~= "404: Not Found", res)
                 if scripturl:find(".lua") then res = "--This watermark is used to delete the file if its cached, remove it to make the file persist after commits.\n"..res end
-                writefile("vape/"..scripturl, res)
+                writefile("pealzware/"..scripturl, res)
             end
-            return readfile("vape/"..scripturl)
+            return readfile("pealzware/"..scripturl)
         end,
         NotifyColor = Color3.fromRGB(93, 63, 211),
         NotifyIcon = 'assets/WarningNotification.png',
