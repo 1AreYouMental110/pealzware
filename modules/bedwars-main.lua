@@ -8930,90 +8930,84 @@ local function run(func)
 	if err then warn("[bedwars-main.lua Module Error]: "..tostring(debug.traceback(err))) end
 end
 
-task.spawn(function()
-	pcall(function()
-		local httpService = game:GetService("HttpService")
-		local function loadJson(path)
-			local suc, res = pcall(function()
-				return httpService:JSONDecode(readfile(path))
-			end)
-			return suc and type(res) == 'table' and res or nil, res
+-- ── Error Log ────────────────────────────────────────────────────────────────
+-- Format optimised for AI consumption: plain text, one entry per block,
+-- minimal token overhead. File: pealzware/PW_ErrorLog.txt
+-- Each session opens with a header line; entries follow chronologically.
+-- ─────────────────────────────────────────────────────────────────────────────
+do
+	local LOG_FILE    = 'pealzware/PW_ErrorLog.txt'
+	local MAX_BYTES   = 65536  -- 64 KB; older content trimmed when exceeded
+	local STACK_LIMIT = 8      -- max stack frames per entry
+
+	-- Written once per executor session so the header doesn't repeat per entry
+	local _sessionHeaderWritten = false
+
+	local function ts()
+		local t = os.date("*t")
+		return string.format("%02d:%02d:%02d", t.hour, t.min, t.sec)
+	end
+
+	local function sessionHeader()
+		local t = os.date("*t")
+		local dt = string.format("%04d-%02d-%02dT%02d:%02d:%02d",
+			t.year, t.month, t.day, t.hour, t.min, t.sec)
+		local exec = identifyexecutor and ({identifyexecutor()})[1] or "unknown"
+		local job  = tostring(game.JobId):sub(1, 8)
+		local mode = tostring(shared and shared.CheatEngineMode or "normal")
+		return string.format(
+			"\n=== SESSION %s | place=%d | job=%s | executor=%s | mode=%s ===\n",
+			dt, game.PlaceId, job, exec, mode
+		)
+	end
+
+	local function cleanStack(raw)
+		if not raw or raw == "" then return nil end
+		local frames, seen = {}, 0
+		for line in (raw .. "\n"):gmatch("([^\n]+)\n?") do
+			line = line:match("^%s*(.-)%s*$")
+			if line ~= "" and line ~= "Stack Begin" and line ~= "Stack End" then
+				table.insert(frames, "  " .. line)
+				seen = seen + 1
+				if seen >= STACK_LIMIT then break end
+			end
+		end
+		return #frames > 0 and table.concat(frames, "\n") or nil
+	end
+
+	function shared.pwLogError(source, message, stack)
+		local hdr = ""
+		if not _sessionHeaderWritten then
+			hdr = sessionHeader()
+			_sessionHeaderWritten = true
 		end
 
-		local function filterStackTrace(stackTrace)
-			stackTrace = stackTrace or "Unknown"
-			if type(stackTrace) ~= "string" then
-				stackTrace = "INVALID: " .. tostring(stackTrace)
-			end
-			if type(stackTrace) == "string" then
-				return string.split(stackTrace, "\n") or {stackTrace}
-			end
-			return {"Unknown"}
+		local entry = string.format("[%s] %s | %s\n", ts(), tostring(source), tostring(message))
+		local frames = cleanStack(stack)
+		if frames then entry = entry .. frames .. "\n" end
+		entry = entry .. "\n"
+
+		local existing = isfile(LOG_FILE) and readfile(LOG_FILE) or ""
+		if #existing > MAX_BYTES then
+			-- Drop oldest ~25% to stay under budget
+			existing = existing:sub(math.floor(MAX_BYTES * 0.25))
+			-- Trim to next newline so we don't start mid-line
+			existing = existing:match("\n(.*)$") or existing
 		end
 
-		local function saveError(message, stackTrace)
-			stackTrace = stackTrace or ''
-			local errorLog = {
-				Message = tostring(message),
-				StackTrace = filterStackTrace(stackTrace)
-			}
-			local S_Name = "CONSOLE"
-			local main = {}
-			if isfile('pealzware/PW_Error_Log.json') then
-				local res = loadJson('pealzware/PW_Error_Log.json')
-				main = res or main
-			end
-			main["LogInfo"] = {
-				Version = "Normal",
-				Executor = identifyexecutor and ({identifyexecutor()})[1] or "Unknown executor",
-				CheatEngineMode = tostring(shared.CheatEngineMode or "Unknown")
-			}
-			local function toTime(timestamp)
-				timestamp = timestamp or os.time()
-				local dateTable = os.date("*t", timestamp)
-				local timeString = string.format("%02d:%02d:%02d", dateTable.hour, dateTable.min, dateTable.sec)
-				return timeString
-			end
-			local function toDate(timestamp)
-				timestamp = timestamp or os.time()
-				local dateTable = os.date("*t", timestamp)
-				local dateString = string.format("%02d/%02d/%02d", dateTable.day, dateTable.month, dateTable.year % 100)
-				return dateString
-			end
-			local function getExecutionTime()
-				return {["toTime"] = toTime(), ["toDate"] = toDate()}
-			end
-			local dateKey = toDate()
-			local placeJobKey = tostring(game.PlaceId) .. " | " .. tostring(game.JobId)
-			main[dateKey] = main[dateKey] or {}
-			main[dateKey][placeJobKey] = main[dateKey][placeJobKey] or {}
-			main[dateKey][placeJobKey][S_Name] = main[dateKey][placeJobKey][S_Name] or {}
-			table.insert(main[dateKey][placeJobKey][S_Name], {
-				Time = getExecutionTime(),
-				Data = errorLog
-			})
-			local success, jsonResult = pcall(function()
-				return httpService:JSONEncode(main)
-			end)
-			if success then
-				writefile('pealzware/PW_Error_Log.json', jsonResult)
-			else
-				warn("Failed to encode JSON: " .. jsonResult)
-			end
-		end
+		pcall(writefile, LOG_FILE, existing .. hdr .. entry)
+	end
 
-		if shared.DEBUGLOGGING then
-			pcall(function()
-				shared.DEBUGLOGGING:Disconnect()
-			end)
+	-- Hook ScriptContext errors (fires for errors without a specific script object)
+	if shared.DEBUGLOGGING then
+		pcall(function() shared.DEBUGLOGGING:Disconnect() end)
+	end
+	shared.DEBUGLOGGING = game:GetService("ScriptContext").Error:Connect(function(message, stack, script)
+		if not script then
+			shared.pwLogError("ScriptContext", message, stack)
 		end
-		shared.DEBUGLOGGING = game:GetService("ScriptContext").Error:Connect(function(message, stack, script)
-			if not script then
-				saveError(message, stack)
-			end
-		end)
 	end)
-end)
+end
 
 local vapeConnections = {}
 GuiLibrary.SelfDestructEvent.Event:Connect(function()
@@ -13559,62 +13553,17 @@ run(function()
 	end)
 end)
 
-local HttpService = game:GetService("HttpService")
-local function loadJson(path)
-	local suc, res = pcall(function()
-		return HttpService:JSONDecode(readfile(path))
-	end)
-	return suc and type(res) == 'table' and res or nil, res
-end
-local function toTime(timestamp)
-	timestamp = timestamp or os.time()
-	local dateTable = os.date("*t", timestamp)
-	local timeString = string.format("%02d:%02d:%02d", dateTable.hour, dateTable.min, dateTable.sec)
-	return timeString
-end
-local function toDate(timestamp)
-	timestamp = timestamp or os.time()
-	local dateTable = os.date("*t", timestamp)
-	local dateString = string.format("%02d/%02d/%02d", dateTable.day, dateTable.month, dateTable.year % 100)
-	return dateString
-end
-local function getExecutionTime()
-	return {["toTime"] = toTime(), ["toDate"] = toDate()}
-end
+-- saveErrorLog: manually called from features to record a named error.
+-- Delegates to shared.pwLogError which was set up in the error log block above.
 local function saveErrorLog(err, S_Name)
 	if not err then return end
-	if not S_Name then S_Name = "Not specified" end
-	local main = {}
-	if isfile('pealzware/PW_Error_Log.json') then
-		local res = loadJson('pealzware/PW_Error_Log.json')
-		main = res or main
+	S_Name = S_Name or "unknown"
+	local stack = debug.traceback(tostring(err))
+	if shared and shared.pwLogError then
+		shared.pwLogError(S_Name, tostring(err), stack)
 	end
-	local errorLog = {
-		Name = S_Name,
-		CheatEngineMode = shared ~= nil and type(shared) == "table" and shared.CheatEngineMode,
-		Response = tostring(err),
-		Debug = debug.traceback(tostring(err)),
-		PlaceId = game.PlaceId,
-		JobId = game.JobId
-	}
-	local dateKey = toDate()
-	local placeJobKey = tostring(game.PlaceId).." | "..tostring(game.JobId)
-	main.DebugLog = main.DebugLog or {}
-	main.DebugLog[dateKey] = main.DebugLog[dateKey] or {}
-	main.DebugLog[dateKey][placeJobKey] = main.DebugLog[dateKey][placeJobKey] or {}
-	main.DebugLog[dateKey][placeJobKey][S_Name] = main.DebugLog[dateKey][placeJobKey][S_Name] or {}
-	table.insert(main.DebugLog[dateKey][placeJobKey][S_Name], {
-		Time = getExecutionTime(),
-		Data = errorLog
-	})
-	local suc, json = pcall(function() return HttpService:JSONEncode(main) end)
-	if suc then
-		writefile('pealzware/PW_Error_Log.json', json)
-	end
-	errorNotification("Pealzware - Error Logger", 'Error logged to pealzware/PW_Error_Log.json\nReport to pealz on discord.gg/pealzware', 10)
-	warn('---------------[ERROR LOG START]--------------')
-	warn(HttpService:JSONEncode(errorLog))
-	warn('---------------[ERROR LOG END]--------------')
+	errorNotification("Pealzware - Error Logger", 'Error logged to pealzware/PW_ErrorLog.txt\nReport to pealz on discord.gg/pealzware', 10)
+	warn("[PW Error] " .. S_Name .. " | " .. tostring(err))
 end
 
 local function getRemotes(paths)
