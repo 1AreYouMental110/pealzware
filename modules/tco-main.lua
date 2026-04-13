@@ -637,7 +637,9 @@ do
     Library.Modules = {}
     -- Remove orphaned BW-era dividers that were added to the main nav sidebar
     pcall(function()
-        local navChildren = Library.Categories.Main.Object:FindFirstChild('Children')
+        local mainCat = Library.Categories.Main
+        if not mainCat or not mainCat.Object then return end
+        local navChildren = mainCat.Object:FindFirstChild('Children')
         if navChildren then
             for _, child in ipairs(navChildren:GetChildren()) do
                 if child.Name == 'Divider' or child.Name == 'DividerLabel' then
@@ -787,9 +789,29 @@ do
         _btn.Text = opts.Text or 'Menu'; _btn.TextColor3 = Library.Palette.Text
         _btn.TextSize = 11; _btn.FontFace = Library.Palette.Font; _btn.ZIndex = 10
         Library.Utility.AddCorner(_btn, UDim.new(0, 5))
+        -- Accent glow border on the main menu toggle
+        local _mStroke = Instance.new('UIStroke')
+        _mStroke.Color = Library.Palette.AccentColor
+        _mStroke.Thickness = 1
+        _mStroke.Transparency = 0.4
+        _mStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+        _mStroke.Parent = _btn
+        local _tsMb = game:GetService('TweenService')
         local _sg = Library.ScaledGui
         if _sg then _btn.Parent = _sg
         else task.defer(function() if Library.ScaledGui then _btn.Parent = Library.ScaledGui end end) end
+        _btn.MouseEnter:Connect(function()
+            _tsMb:Create(_btn, TweenInfo.new(0.1), { BackgroundTransparency = 0.18 }):Play()
+        end)
+        _btn.MouseLeave:Connect(function()
+            _tsMb:Create(_btn, TweenInfo.new(0.1), { BackgroundTransparency = 0 }):Play()
+        end)
+        _btn.MouseButton1Down:Connect(function()
+            _tsMb:Create(_btn, TweenInfo.new(0.05), { BackgroundTransparency = 0.4 }):Play()
+        end)
+        _btn.MouseButton1Up:Connect(function()
+            _tsMb:Create(_btn, TweenInfo.new(0.1), { BackgroundTransparency = 0 }):Play()
+        end)
         _btn.MouseButton1Click:Connect(function()
             local cg = Library.ClickGui; if cg then cg.Visible = not cg.Visible end
         end)
@@ -806,10 +828,51 @@ do
         self:Notify(_title, _text, tonumber(dur) or 6, kind)
     end
 
-    -- ── OnChanged helper ──────────────────────────────────────────────
-    -- modern.lua components call optionsettings.Function by table-lookup
-    -- at fire-time, so replacing opts.Function AFTER creation correctly
-    -- chains callbacks.  This bridges the RomazHub OnChanged pattern.
+    -- ── UI sound feedback ─────────────────────────────────────────────────
+    -- Subtle click/pop sounds for every toggle, button, and dropdown.
+    -- Sounds are lazy-cached so the first interaction creates them once.
+    local _uiSounds   = {}
+    local _uiSoundIds = {
+        Toggle   = 'rbxassetid://9119713951',  -- soft pop
+        Button   = 'rbxassetid://6026984224',  -- click
+        Dropdown = 'rbxassetid://6026984224',
+    }
+    local _svcSnd
+    pcall(function() _svcSnd = game:GetService('SoundService') end)
+    local function _playUiSound(nm)
+        local id = _uiSoundIds[nm]
+        if not id then return end
+        local s = _uiSounds[id]
+        if not s or not s.Parent then
+            s = Instance.new('Sound')
+            s.SoundId = id
+            s.Volume  = 0.22
+            s.RollOffMaxDistance = 0
+            pcall(function() s.Parent = _svcSnd or workspace end)
+            _uiSounds[id] = s
+        end
+        pcall(function() s:Play() end)
+    end
+    Library._playUiSound = _playUiSound   -- expose for raw button helpers below
+
+    -- ── Tween shorthand ───────────────────────────────────────────────────
+    local _ts = game:GetService('TweenService')
+    local function _tw(inst, t, props, style, dir)
+        if not inst then return end
+        pcall(function()
+            _ts:Create(inst,
+                TweenInfo.new(t or 0.15,
+                    style or Enum.EasingStyle.Quart,
+                    dir   or Enum.EasingDirection.Out),
+                props):Play()
+        end)
+    end
+    Library._tw = _tw   -- expose for CreatePopout/createToolButton below
+
+    -- ── OnChanged helper ──────────────────────────────────────────────────
+    -- modern.lua calls optionsettings.Function by TABLE LOOKUP at fire-time
+    -- (not closure capture), so replacing opts.Function after creation
+    -- chains callbacks correctly.  This bridges the RomazHub OnChanged API.
     local function _addOnChanged(ctrl, opts)
         if not ctrl or type(ctrl) ~= 'table' or ctrl.OnChanged then return ctrl end
         function ctrl:OnChanged(fn)
@@ -825,32 +888,42 @@ do
         return ctrl
     end
 
-    -- ── CreateCategory: use modern.lua's real implementation which injects
-    --    proper Apple-style toggles, interactive sliders, animated dropdowns,
-    --    and all other polished components via the components-table loop.
-    --    We only add the OnChanged shim on top; everything else is modern.lua's.
+    -- ── CreateCategory: use modern.lua's real implementation (Apple-style
+    --    toggles, interactive sliders, animated dropdowns, etc.).
+    --    We inject: sound feedback, OnChanged shim, Refresh alias.
     local _modCat = Library.CreateCategory
     function Library:CreateCategory(s)
         s = s or {}
-        local cat = _modCat(self, s) or {}
-        if not cat then return cat end
-        -- Patch CreateModule so its returned moduleapi objects get OnChanged support
+        local cat = _modCat(self, s)
+        if not cat then return nil end
         local _origCM = cat.CreateModule
         if type(_origCM) == 'function' then
             cat.CreateModule = function(self2, ms)
                 local mod = _origCM(self2, ms)
-                if not mod then return mod end
-                -- Wrap each Create* to inject OnChanged + compatibility aliases
+                if not mod then return nil end
                 local _patch = {'Toggle','Slider','Dropdown','TextBox','Button','Label','ColorSlider','TwoSlider'}
                 for _, nm in ipairs(_patch) do
                     local _origFn = mod['Create'..nm]
                     if type(_origFn) == 'function' then
                         mod['Create'..nm] = function(self3, opts)
+                            -- Pre-wire sound into opts.Function before component creation
+                            -- so modern.lua's hookCF captures the sound-aware version.
+                            if opts and _uiSoundIds[nm] then
+                                local _userFn = opts.Function
+                                opts.Function = function(...)
+                                    _playUiSound(nm)
+                                    if type(_userFn) == 'function' then
+                                        pcall(_userFn, ...)
+                                    end
+                                end
+                            end
                             local ctrl = _origFn(self3, opts)
-                            _addOnChanged(ctrl, opts)
-                            -- Dropdown: modern.lua uses :Change(list) but RomazHub calls :Refresh(list)
-                            if ctrl and nm == 'Dropdown' and ctrl.Change and not ctrl.Refresh then
-                                ctrl.Refresh = ctrl.Change
+                            if ctrl then
+                                _addOnChanged(ctrl, opts)
+                                -- :Refresh() alias — modern.lua uses :Change(), script uses :Refresh()
+                                if nm == 'Dropdown' and ctrl.Change and not ctrl.Refresh then
+                                    ctrl.Refresh = ctrl.Change
+                                end
                             end
                             return ctrl
                         end
@@ -1189,6 +1262,24 @@ function Library:CreatePopout(opts)
     _panel.Parent = Library.ScaledGui
     Library.Utility.AddBlur(_panel)
     Library.Utility.AddCorner(_panel, UDim.new(0, 8))
+    -- Accent glow border
+    local _panelStroke = Instance.new('UIStroke')
+    _panelStroke.Color = Library.Palette.AccentColor
+    _panelStroke.Thickness = 1.2
+    _panelStroke.Transparency = 0.5
+    _panelStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    _panelStroke.Parent = _panel
+    -- Top-edge highlight glow strip
+    local _panelGlow = Instance.new('Frame')
+    _panelGlow.Name = '_accentGlow'
+    _panelGlow.Size = UDim2.new(0.6, 0, 0, 2)
+    _panelGlow.Position = UDim2.new(0.2, 0, 0, 0)
+    _panelGlow.BackgroundColor3 = Library.Palette.AccentColor
+    _panelGlow.BackgroundTransparency = 0.2
+    _panelGlow.BorderSizePixel = 0
+    _panelGlow.ZIndex = 12
+    _panelGlow.Parent = _panel
+    Instance.new('UICorner', _panelGlow).CornerRadius = UDim.new(1, 0)
     Library.Utility.MakeDraggable(_panel)
 
     local _header = Instance.new('TextLabel')
@@ -1267,7 +1358,8 @@ function Library:CreatePopout(opts)
             s = s or {}
             local _btn = Instance.new('TextButton')
             _btn.Size = UDim2.new(1, -8, 0, 26)
-            _btn.BackgroundColor3 = Library.Color.Light(Library.Palette.Main, 0.07)
+            local _gbBase = Library.Color.Light(Library.Palette.Main, 0.07)
+            _btn.BackgroundColor3 = _gbBase
             _btn.Text = s.Name or 'Button'
             _btn.TextColor3 = Library.Palette.Text
             _btn.TextSize = 12
@@ -1276,8 +1368,23 @@ function Library:CreatePopout(opts)
             _btn.ZIndex = 13
             _btn.Parent = _grpContent
             Library.Utility.AddCorner(_btn, UDim.new(0, 4))
+            local _tsGb = game:GetService('TweenService')
+            local _gbHover = Library.Color.Light(Library.Palette.Main, 0.16)
+            _btn.MouseEnter:Connect(function()
+                _tsGb:Create(_btn, TweenInfo.new(0.1), { BackgroundColor3 = _gbHover }):Play()
+            end)
+            _btn.MouseLeave:Connect(function()
+                _tsGb:Create(_btn, TweenInfo.new(0.1), { BackgroundColor3 = _gbBase }):Play()
+            end)
+            _btn.MouseButton1Down:Connect(function()
+                _tsGb:Create(_btn, TweenInfo.new(0.05), { BackgroundColor3 = Library.Palette.AccentColor }):Play()
+            end)
+            _btn.MouseButton1Up:Connect(function()
+                _tsGb:Create(_btn, TweenInfo.new(0.1), { BackgroundColor3 = _gbHover }):Play()
+            end)
             if s.Function then
                 _btn.MouseButton1Click:Connect(function()
+                    if Library._playUiSound then Library._playUiSound('Button') end
                     pcall(s.Function)
                 end)
             end
@@ -1313,22 +1420,37 @@ function Library:CreatePopout(opts)
             _lbl.ZIndex = 13
             _lbl.Parent = _row
 
-            local _knob = Instance.new('TextButton')
-            _knob.Size = UDim2.fromOffset(28, 16)
-            _knob.AnchorPoint = Vector2.new(1, 0.5)
-            _knob.Position = UDim2.new(1, -4, 0.5, 0)
-            _knob.BackgroundColor3 = s.Default and Library.Palette.AccentColor or Color3.fromRGB(60,60,60)
-            _knob.Text = ''
-            _knob.ZIndex = 14
-            _knob.Parent = _row
-            Library.Utility.AddCorner(_knob, UDim.new(1, 0))
+            -- Apple-style toggle track + pip
+            local _track = Instance.new('TextButton')
+            _track.Size = UDim2.fromOffset(30, 17)
+            _track.AnchorPoint = Vector2.new(1, 0.5)
+            _track.Position = UDim2.new(1, -4, 0.5, 0)
+            _track.BackgroundColor3 = s.Default and Library.Palette.AccentColor or Color3.fromRGB(55,55,60)
+            _track.Text = ''
+            _track.ZIndex = 14
+            _track.Parent = _row
+            Library.Utility.AddCorner(_track, UDim.new(1, 0))
+            local _pip = Instance.new('Frame')
+            _pip.Size = UDim2.fromOffset(11, 11)
+            _pip.AnchorPoint = Vector2.new(0.5, 0.5)
+            _pip.Position = s.Default and UDim2.new(0.75, 0, 0.5, 0) or UDim2.new(0.28, 0, 0.5, 0)
+            _pip.BackgroundColor3 = Color3.new(1,1,1)
+            _pip.BorderSizePixel = 0
+            _pip.ZIndex = 15
+            _pip.Parent = _track
+            Library.Utility.AddCorner(_pip, UDim.new(1, 0))
 
+            local _tsTog = game:GetService('TweenService')
+            local _offColor = Color3.fromRGB(55,55,60)
             local _val = s.Default == true
             local _api = { Value = _val, Type = 'Toggle' }
             function _api:SetValue(v)
                 _val = v == true
                 self.Value = _val
-                _knob.BackgroundColor3 = _val and Library.Palette.AccentColor or Color3.fromRGB(60,60,60)
+                _tsTog:Create(_track, TweenInfo.new(0.16, Enum.EasingStyle.Quart),
+                    { BackgroundColor3 = _val and Library.Palette.AccentColor or _offColor }):Play()
+                _tsTog:Create(_pip, TweenInfo.new(0.16, Enum.EasingStyle.Quart),
+                    { Position = _val and UDim2.new(0.75,0,0.5,0) or UDim2.new(0.28,0,0.5,0) }):Play()
                 if s.Function then pcall(s.Function, _val) end
             end
             function _api:OnChanged(fn)
@@ -1336,7 +1458,8 @@ function Library:CreatePopout(opts)
                 s.Function = function(v) _prev(v); fn(v) end
                 return self
             end
-            _knob.MouseButton1Click:Connect(function()
+            _track.MouseButton1Click:Connect(function()
+                if Library._playUiSound then Library._playUiSound('Toggle') end
                 _api:SetValue(not _val)
             end)
             return _api
@@ -1532,8 +1655,48 @@ function Library:CreatePopout(opts)
         _togBtn.ZIndex = 10
         _togBtn.Parent = Library.ScaledGui
         Library.Utility.AddCorner(_togBtn, UDim.new(0, 5))
+        -- Glow stroke on toggle button
+        local _togStroke = Instance.new('UIStroke')
+        _togStroke.Color = Library.Palette.AccentColor
+        _togStroke.Thickness = 1
+        _togStroke.Transparency = 0.4
+        _togStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+        _togStroke.Parent = _togBtn
+        local _tsPop = game:GetService('TweenService')
+        local _panelTargetSize = opts.Size or UDim2.fromOffset(380, 520)
+        -- Tween panel in / out instead of instant show/hide
         _togBtn.MouseButton1Click:Connect(function()
-            _panel.Visible = not _panel.Visible
+            if _panel.Visible then
+                _tsPop:Create(_panel,
+                    TweenInfo.new(0.18, Enum.EasingStyle.Quart, Enum.EasingDirection.In),
+                    { BackgroundTransparency = 1,
+                      Size = UDim2.fromOffset(_panelTargetSize.X.Offset, _panelTargetSize.Y.Offset - 16) }):Play()
+                task.delay(0.18, function()
+                    _panel.Visible = false
+                    _panel.BackgroundTransparency = 0
+                    _panel.Size = _panelTargetSize
+                end)
+            else
+                _panel.Size = UDim2.fromOffset(_panelTargetSize.X.Offset, _panelTargetSize.Y.Offset - 16)
+                _panel.BackgroundTransparency = 1
+                _panel.Visible = true
+                _tsPop:Create(_panel,
+                    TweenInfo.new(0.22, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+                    { BackgroundTransparency = 0, Size = _panelTargetSize }):Play()
+            end
+        end)
+        -- Hover glow
+        _togBtn.MouseEnter:Connect(function()
+            _tsPop:Create(_togBtn, TweenInfo.new(0.1), { BackgroundTransparency = 0.2 }):Play()
+        end)
+        _togBtn.MouseLeave:Connect(function()
+            _tsPop:Create(_togBtn, TweenInfo.new(0.1), { BackgroundTransparency = 0 }):Play()
+        end)
+        _togBtn.MouseButton1Down:Connect(function()
+            _tsPop:Create(_togBtn, TweenInfo.new(0.05), { BackgroundTransparency = 0.4 }):Play()
+        end)
+        _togBtn.MouseButton1Up:Connect(function()
+            _tsPop:Create(_togBtn, TweenInfo.new(0.1), { BackgroundTransparency = 0 }):Play()
         end)
         return _togBtn
     end
@@ -1720,6 +1883,23 @@ createToolPanel = function(config)
     _panel.Parent = _outer
     Library.Utility.AddBlur(_panel)
     Library.Utility.AddCorner(_panel, UDim.new(0, 8))
+    -- Accent glow border on all tool panels
+    local _tpStroke = Instance.new('UIStroke')
+    _tpStroke.Color = Library.Palette.AccentColor
+    _tpStroke.Thickness = 1.1
+    _tpStroke.Transparency = 0.52
+    _tpStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    _tpStroke.Parent = _panel
+    -- Top highlight
+    local _tpGlow = Instance.new('Frame')
+    _tpGlow.Size = UDim2.new(0.55, 0, 0, 2)
+    _tpGlow.Position = UDim2.new(0.225, 0, 0, 0)
+    _tpGlow.BackgroundColor3 = Library.Palette.AccentColor
+    _tpGlow.BackgroundTransparency = 0.25
+    _tpGlow.BorderSizePixel = 0
+    _tpGlow.ZIndex = 3
+    _tpGlow.Parent = _panel
+    Instance.new('UICorner', _tpGlow).CornerRadius = UDim.new(1, 0)
 
     local _heading = Instance.new('TextLabel')
     _heading.Size = UDim2.new(1, -20, 0, 24)
@@ -1765,7 +1945,8 @@ createToolButton = function(frame, text, yPos, xPos, width, callback)
     local _btn = Instance.new('TextButton')
     _btn.Size = UDim2.new(width or 0.9, 0, 0, 26)
     _btn.Position = UDim2.new(xPos or 0.05, 0, yPos or 0, 0)
-    _btn.BackgroundColor3 = Library.Color.Light(Library.Palette.Main, 0.08)
+    local _ctbBase = Library.Color.Light(Library.Palette.Main, 0.08)
+    _btn.BackgroundColor3 = _ctbBase
     _btn.Text = text or ''
     _btn.TextColor3 = Library.Palette.Text
     _btn.TextSize = 12
@@ -1774,8 +1955,25 @@ createToolButton = function(frame, text, yPos, xPos, width, callback)
     _btn.ZIndex = 4
     _btn.Parent = frame
     Library.Utility.AddCorner(_btn, UDim.new(0, 5))
+    local _tsCTB = game:GetService('TweenService')
+    local _ctbHover = Library.Color.Light(Library.Palette.Main, 0.18)
+    _btn.MouseEnter:Connect(function()
+        _tsCTB:Create(_btn, TweenInfo.new(0.1), { BackgroundColor3 = _ctbHover }):Play()
+    end)
+    _btn.MouseLeave:Connect(function()
+        _tsCTB:Create(_btn, TweenInfo.new(0.1), { BackgroundColor3 = _ctbBase }):Play()
+    end)
+    _btn.MouseButton1Down:Connect(function()
+        _tsCTB:Create(_btn, TweenInfo.new(0.05), { BackgroundColor3 = Library.Palette.AccentColor }):Play()
+    end)
+    _btn.MouseButton1Up:Connect(function()
+        _tsCTB:Create(_btn, TweenInfo.new(0.1), { BackgroundColor3 = _ctbHover }):Play()
+    end)
     if callback then
-        _btn.MouseButton1Click:Connect(function() pcall(callback, _btn) end)
+        _btn.MouseButton1Click:Connect(function()
+            if Library._playUiSound then Library._playUiSound('Button') end
+            pcall(callback, _btn)
+        end)
     end
     return _btn
 end
