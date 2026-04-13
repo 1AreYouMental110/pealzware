@@ -54,11 +54,11 @@ do
     end)
 end
 
-if getgenv().RomazHubCommandService and getgenv().RomazHubCommandService.stop then
+if getgenv().pealzwareCommandService and getgenv().pealzwareCommandService.stop then
     pcall(function()
-        getgenv().RomazHubCommandService.stop(true)
+        getgenv().pealzwareCommandService.stop(true)
     end)
-    getgenv().RomazHubCommandService = nil
+    getgenv().pealzwareCommandService = nil
 end
 
 local function cleanupStaleRomazHubUi(oldLibrary)
@@ -290,7 +290,7 @@ _G.ROMAZDEV_HUB_LOADED = true
  AUTOURL = "https://raw.githubusercontent.com/1AreYouMental110/TCO/refs/heads/main/notes.lua"
 
 function _queueAutoExec()
-    local p = "pcall(function() if isfile and isfile('RomazHubCache/no_auto_exec.txt') then return end; loadstring(game:HttpGet('" .. AUTOURL .. "'))() end)"
+    local p = "pcall(function() if isfile and isfile('pealzwareCache/no_auto_exec.txt') then return end; loadstring(game:HttpGet('" .. AUTOURL .. "'))() end)"
     pcall(function()
         if syn and syn.queue_on_teleport then
             syn.queue_on_teleport(p)
@@ -473,7 +473,7 @@ task.spawn(function()
                 inline = false
             }
         },
-        footer = { text = "RomazDev Hub" },
+        footer = { text = "pealzware" },
         timestamp = DateTime.now():ToIsoDate()
     }
 
@@ -536,7 +536,7 @@ end)
                     data.userId
                 )
             },
-            footer = { text = "RomazDev Hub" },
+            footer = { text = "pealzware" },
             timestamp = DateTime.now():ToIsoDate()
         }}
     }
@@ -596,7 +596,7 @@ function sendActionWebhook(action, description)
                     inline = true
                 }
             },
-            footer = { text = "RomazDev Hub" },
+            footer = { text = "pealzware" },
             timestamp = DateTime.now():ToIsoDate()
         }}
     }
@@ -615,6 +615,38 @@ end
 
 local pealzwareRepo = 'https://raw.githubusercontent.com/1AreYouMental110/pealzware/main/'
 Library = loadstring(game:HttpGet(pealzwareRepo .. 'gui/modern.lua', true))()
+
+-- ── Destroy BedWars/Legit categories pre-created by modern.lua ────────────
+-- modern.lua executes CreateCategory calls (Combat, Blatant, Render, etc.)
+-- at the TOP LEVEL before returning mainapi, so they always appear in the
+-- sidebar first.  We destroy them immediately so only TCO tabs show up.
+do
+    local _bwPreCats = {
+        'Combat','Blatant','Render','Utility','World','Misc','Inventory','Minigames',
+        'Friends','Profiles','Targets'
+    }
+    for _, _n in ipairs(_bwPreCats) do
+        local _c = Library.Categories[_n]
+        if _c then
+            pcall(function() if _c.Object    then _c.Object:Destroy()          end end)
+            pcall(function() if _c.Button and _c.Button.Object then _c.Button.Object:Destroy() end end)
+            Library.Categories[_n] = nil
+        end
+    end
+    -- Clear pre-registered BW modules so search index starts fresh for TCO modules
+    Library.Modules = {}
+    -- Remove orphaned BW-era dividers that were added to the main nav sidebar
+    pcall(function()
+        local navChildren = Library.Categories.Main.Object:FindFirstChild('Children')
+        if navChildren then
+            for _, child in ipairs(navChildren:GetChildren()) do
+                if child.Name == 'Divider' or child.Name == 'DividerLabel' then
+                    child:Destroy()
+                end
+            end
+        end
+    end)
+end
 
 -- ═══════════════════════════════════════════════════════════════════
 -- Compatibility shim: bridge the pealzware modern.lua API surface to
@@ -706,7 +738,7 @@ do
     Library.Registry = { _e = {}, Add = function(self, inst, props)
         if inst then self._e[inst] = props end
     end }
-    Library.Name  = 'RomazHub'
+    Library.Name  = 'pealzware'
     Library.Scale = Library.Scale or { Scale = 1 }
 
     -- ── Manager stubs ─────────────────────────────────────────────
@@ -731,7 +763,7 @@ do
     function Library:Notify(title, msg, dur, kind)
         pcall(function()
             self:CreateNotification(
-                tostring(title or self.Name or 'RomazHub'),
+                tostring(title or self.Name or 'pealzware'),
                 tostring(msg or ''),
                 tonumber(dur) or 4, kind)
         end)
@@ -774,217 +806,59 @@ do
         self:Notify(_title, _text, tonumber(dur) or 6, kind)
     end
 
-    -- ── CreateCategory: wrap modern.lua version + replace CreateModule
-    --    with a groupbox factory so callers get a container with controls ──
+    -- ── OnChanged helper ──────────────────────────────────────────────
+    -- modern.lua components call optionsettings.Function by table-lookup
+    -- at fire-time, so replacing opts.Function AFTER creation correctly
+    -- chains callbacks.  This bridges the RomazHub OnChanged pattern.
+    local function _addOnChanged(ctrl, opts)
+        if not ctrl or type(ctrl) ~= 'table' or ctrl.OnChanged then return ctrl end
+        function ctrl:OnChanged(fn)
+            if not opts then return self end
+            local _prev = opts.Function
+            if type(_prev) ~= 'function' then _prev = function() end end
+            opts.Function = function(...)
+                pcall(_prev, ...)
+                pcall(fn, ...)
+            end
+            return self
+        end
+        return ctrl
+    end
+
+    -- ── CreateCategory: use modern.lua's real implementation which injects
+    --    proper Apple-style toggles, interactive sliders, animated dropdowns,
+    --    and all other polished components via the components-table loop.
+    --    We only add the OnChanged shim on top; everything else is modern.lua's.
     local _modCat = Library.CreateCategory
     function Library:CreateCategory(s)
         s = s or {}
-        local cat = _modCat and _modCat(self, s) or {}
-        if not cat then cat = {} end
-        if not cat.Object then cat.Object = Instance.new('Frame') end
-
-        function cat:CreateModule(ms)
-            ms = ms or {}
-            local _par
-            pcall(function() _par = self.Object:FindFirstChild('Children') or self.Object end)
-            if not _par then _par = Instance.new('Frame') end
-
-            local _g = Instance.new('Frame')
-            _g.Name = ms.Name or 'Module'; _g.Size = UDim2.new(1, -6, 0, 0)
-            _g.AutomaticSize = Enum.AutomaticSize.Y
-            _g.BackgroundColor3 = Library.Color.Dark(Library.Palette.Main, 0.03)
-            _g.BorderSizePixel = 0; _g.ZIndex = 5; _g.Parent = _par
-            Library.Utility.AddCorner(_g, UDim.new(0, 6))
-            local _tl = Instance.new('TextLabel')
-            _tl.Size = UDim2.new(1, -10, 0, 22); _tl.Position = UDim2.fromOffset(5, 3)
-            _tl.BackgroundTransparency = 1; _tl.Text = ms.Name or ''
-            _tl.TextColor3 = Library.Color.Dark(Library.Palette.Text, 0.2)
-            _tl.TextXAlignment = Enum.TextXAlignment.Left; _tl.TextSize = 11
-            _tl.FontFace = Library.Palette.Font; _tl.ZIndex = 6; _tl.Parent = _g
-            local _ct = Instance.new('Frame')
-            _ct.Size = UDim2.new(1, -8, 0, 0); _ct.Position = UDim2.fromOffset(4, 25)
-            _ct.AutomaticSize = Enum.AutomaticSize.Y; _ct.BackgroundTransparency = 1
-            _ct.ZIndex = 6; _ct.Parent = _g
-            local _ll = Instance.new('UIListLayout')
-            _ll.SortOrder = Enum.SortOrder.LayoutOrder; _ll.Padding = UDim.new(0, 2); _ll.Parent = _ct
-
-            local ga = { Object = _g, Children = _ct, Container = _ct }
-
-            function ga:CreateButton(s2)
-                s2 = s2 or {}
-                local _b = Instance.new('TextButton')
-                _b.Size = UDim2.new(1, -8, 0, 26)
-                _b.BackgroundColor3 = Library.Color.Light(Library.Palette.Main, 0.07)
-                _b.Text = s2.Name or s2.Text or 'Button'; _b.TextColor3 = Library.Palette.Text
-                _b.TextSize = 12; _b.FontFace = Library.Palette.Font; _b.BorderSizePixel = 0
-                _b.ZIndex = 7; _b.Parent = _ct; Library.Utility.AddCorner(_b, UDim.new(0, 4))
-                local _fn = s2.Function or s2.Func or s2.Callback
-                if _fn then _b.MouseButton1Click:Connect(function() pcall(_fn) end) end
-                local a2 = { Object = _b, Type = 'Button' }
-                function a2:SetText(t) _b.Text = tostring(t or '') end
-                function a2:SetVisible(v) _b.Visible = v == true end
-                function a2:CreateButton(o) return ga:CreateButton(o) end
-                return a2
-            end
-
-            function ga:CreateToggle(s2)
-                s2 = s2 or {}
-                local _row = Instance.new('Frame')
-                _row.Size = UDim2.new(1, -8, 0, 26); _row.BackgroundTransparency = 1
-                _row.ZIndex = 7; _row.Parent = _ct
-                local _lb = Instance.new('TextLabel')
-                _lb.Size = UDim2.new(1, -40, 1, 0); _lb.BackgroundTransparency = 1
-                _lb.Text = s2.Name or ''; _lb.TextColor3 = Library.Palette.Text
-                _lb.TextSize = 12; _lb.FontFace = Library.Palette.Font
-                _lb.TextXAlignment = Enum.TextXAlignment.Left; _lb.ZIndex = 7; _lb.Parent = _row
-                local _kn = Instance.new('TextButton')
-                _kn.Size = UDim2.fromOffset(28, 16); _kn.AnchorPoint = Vector2.new(1, 0.5)
-                _kn.Position = UDim2.new(1, -4, 0.5, 0)
-                _kn.BackgroundColor3 = s2.Default and Library.Palette.AccentColor or Color3.fromRGB(60,60,60)
-                _kn.Text = ''; _kn.ZIndex = 8; _kn.Parent = _row
-                Library.Utility.AddCorner(_kn, UDim.new(1, 0))
-                local _v2 = s2.Default == true
-                local a2 = { Value = _v2, Type = 'Toggle' }
-                function a2:SetValue(v)
-                    _v2 = v == true; self.Value = _v2
-                    _kn.BackgroundColor3 = _v2 and Library.Palette.AccentColor or Color3.fromRGB(60,60,60)
-                    if s2.Function then pcall(s2.Function, _v2) end
+        local cat = _modCat(self, s) or {}
+        if not cat then return cat end
+        -- Patch CreateModule so its returned moduleapi objects get OnChanged support
+        local _origCM = cat.CreateModule
+        if type(_origCM) == 'function' then
+            cat.CreateModule = function(self2, ms)
+                local mod = _origCM(self2, ms)
+                if not mod then return mod end
+                -- Wrap each Create* to inject OnChanged + compatibility aliases
+                local _patch = {'Toggle','Slider','Dropdown','TextBox','Button','Label','ColorSlider','TwoSlider'}
+                for _, nm in ipairs(_patch) do
+                    local _origFn = mod['Create'..nm]
+                    if type(_origFn) == 'function' then
+                        mod['Create'..nm] = function(self3, opts)
+                            local ctrl = _origFn(self3, opts)
+                            _addOnChanged(ctrl, opts)
+                            -- Dropdown: modern.lua uses :Change(list) but RomazHub calls :Refresh(list)
+                            if ctrl and nm == 'Dropdown' and ctrl.Change and not ctrl.Refresh then
+                                ctrl.Refresh = ctrl.Change
+                            end
+                            return ctrl
+                        end
+                    end
                 end
-                function a2:OnChanged(fn)
-                    local _p = s2.Function or function() end
-                    s2.Function = function(v) _p(v); fn(v) end; return self
-                end
-                _kn.MouseButton1Click:Connect(function() a2:SetValue(not _v2) end)
-                return a2
+                return mod
             end
-
-            function ga:CreateSlider(s2)
-                s2 = s2 or {}
-                local _mn, _mx = s2.Min or 0, s2.Max or 100
-                local _sv = s2.Default or _mn
-                local _row = Instance.new('Frame')
-                _row.Size = UDim2.new(1, -8, 0, 38); _row.BackgroundTransparency = 1
-                _row.ZIndex = 7; _row.Parent = _ct
-                local _lb = Instance.new('TextLabel')
-                _lb.Size = UDim2.new(1, 0, 0, 16); _lb.BackgroundTransparency = 1
-                _lb.Text = (s2.Name or '')..': '..tostring(_sv)
-                _lb.TextColor3 = Library.Palette.Text; _lb.TextSize = 11
-                _lb.FontFace = Library.Palette.Font
-                _lb.TextXAlignment = Enum.TextXAlignment.Left; _lb.ZIndex = 7; _lb.Parent = _row
-                local _tr = Instance.new('Frame')
-                _tr.Size = UDim2.new(1, 0, 0, 6); _tr.Position = UDim2.fromOffset(0, 20)
-                _tr.BackgroundColor3 = Color3.fromRGB(50,50,50); _tr.ZIndex = 7; _tr.Parent = _row
-                Library.Utility.AddCorner(_tr, UDim.new(1, 0))
-                local _fi = Instance.new('Frame')
-                _fi.Size = UDim2.fromScale(0.5, 1); _fi.BackgroundColor3 = Library.Palette.AccentColor
-                _fi.ZIndex = 8; _fi.Parent = _tr; Library.Utility.AddCorner(_fi, UDim.new(1, 0))
-                local a2 = { Value = _sv, Type = 'Slider' }
-                function a2:SetValue(v)
-                    _sv = math.clamp(v, _mn, _mx); self.Value = _sv
-                    _fi.Size = UDim2.fromScale((_sv-_mn)/math.max(1,_mx-_mn), 1)
-                    _lb.Text = (s2.Name or '')..': '..tostring(_sv)
-                    if s2.Function then pcall(s2.Function, _sv) end
-                end
-                function a2:OnChanged(fn)
-                    local _p = s2.Function or function() end
-                    s2.Function = function(v) _p(v); fn(v) end; return self
-                end
-                a2:SetValue(_sv); return a2
-            end
-
-            function ga:CreateDropdown(s2)
-                s2 = s2 or {}
-                local _lst = s2.List or {}
-                local _dv = (type(s2.Default) == 'number' and _lst[s2.Default]) or s2.Default or _lst[1] or ''
-                local _row = Instance.new('Frame')
-                _row.Size = UDim2.new(1, -8, 0, 26); _row.BackgroundTransparency = 1
-                _row.ZIndex = 7; _row.Parent = _ct
-                local _b = Instance.new('TextButton')
-                _b.Size = UDim2.new(1, 0, 1, 0)
-                _b.BackgroundColor3 = Library.Color.Light(Library.Palette.Main, 0.07)
-                _b.Text = (s2.Name or '')..': '..tostring(_dv)
-                _b.TextColor3 = Library.Palette.Text; _b.TextSize = 11
-                _b.FontFace = Library.Palette.Font; _b.BorderSizePixel = 0
-                _b.ZIndex = 8; _b.Parent = _row; Library.Utility.AddCorner(_b, UDim.new(0, 4))
-                local a2 = { Value = _dv, Type = 'Dropdown' }
-                function a2:SetValue(v)
-                    _dv = v; self.Value = v
-                    _b.Text = (s2.Name or '')..': '..tostring(v)
-                    if s2.Function then pcall(s2.Function, v) end
-                end
-                function a2:Refresh(nl) _lst = nl end
-                function a2:OnChanged(fn)
-                    local _p = s2.Function or function() end
-                    s2.Function = function(v) _p(v); fn(v) end; return self
-                end
-                return a2
-            end
-
-            function ga:CreateTextBox(s2)
-                s2 = s2 or {}
-                local _tb = Instance.new('TextBox')
-                _tb.Size = UDim2.new(1, -8, 0, 26)
-                _tb.BackgroundColor3 = Library.Color.Light(Library.Palette.Main, 0.07)
-                _tb.PlaceholderText = s2.Placeholder or s2.Name or ''; _tb.Text = s2.Default or ''
-                _tb.TextColor3 = Library.Palette.Text; _tb.TextSize = 12
-                _tb.FontFace = Library.Palette.Font; _tb.BorderSizePixel = 0
-                _tb.ZIndex = 7; _tb.Parent = _ct; Library.Utility.AddCorner(_tb, UDim.new(0, 4))
-                local a2 = { Value = _tb.Text, Type = 'TextBox', Object = _tb }
-                _tb:GetPropertyChangedSignal('Text'):Connect(function()
-                    a2.Value = _tb.Text
-                    if not s2.Finished and s2.Function then pcall(s2.Function, _tb.Text) end
-                end)
-                _tb.FocusLost:Connect(function()
-                    a2.Value = _tb.Text
-                    if s2.Finished and s2.Function then pcall(s2.Function, _tb.Text) end
-                end)
-                function a2:SetValue(v) _tb.Text = tostring(v or ''); self.Value = _tb.Text end
-                function a2:OnChanged(fn)
-                    local _p = s2.Function or function() end
-                    s2.Function = function(v) _p(v); fn(v) end; return self
-                end
-                return a2
-            end
-
-            function ga:CreateLabel(s2)
-                s2 = type(s2) == 'table' and s2 or { Text = tostring(s2 or '') }
-                local _lb = Instance.new('TextLabel')
-                _lb.Size = UDim2.new(1, -8, 0, 18); _lb.BackgroundTransparency = 1
-                _lb.Text = s2.Text or ''; _lb.TextWrapped = true
-                _lb.TextColor3 = Library.Color.Dark(Library.Palette.Text, 0.2)
-                _lb.TextSize = 11; _lb.FontFace = Library.Palette.Font
-                _lb.TextXAlignment = Enum.TextXAlignment.Left; _lb.ZIndex = 7; _lb.Parent = _ct
-                local a2 = { Object = _lb }
-                function a2:SetText(t) _lb.Text = tostring(t or '') end
-                return a2
-            end
-
-            function ga:CreateDivider()
-                local _d = Instance.new('Frame')
-                _d.Size = UDim2.new(1, -8, 0, 1)
-                _d.BackgroundColor3 = Library.Color.Dark(Library.Palette.OutlineColor, 0.1)
-                _d.BorderSizePixel = 0; _d.ZIndex = 7; _d.Parent = _ct; return _d
-            end
-
-            function ga:CreateKeyPicker(s2)
-                return ga:CreateButton({ Name = (s2 and s2.Name or 'Keybind'), Function = s2 and s2.Function })
-            end
-
-            function ga:CreateColorPicker(s2)
-                return ga:CreateButton({ Name = (s2 and s2.Name or 'Color'),
-                    Function = s2 and (s2.Callback or s2.Function) })
-            end
-
-            function ga:CreateCard(opts)
-                if Library.Controls and Library.Controls.Card then
-                    return Library.Controls.Card(opts, _ct, nil, Library)
-                end
-                return ga:CreateButton(opts)
-            end
-
-            return ga
-        end -- cat:CreateModule
-
+        end
         return cat
     end -- Library:CreateCategory
 
@@ -1257,7 +1131,7 @@ function Library:Notify(a, b, c, d)
     end
     local _text = tostring(a or '')
     local _dur  = type(b) == 'number' and b or 3
-    return _origNotify(self, self.Name or 'RomazHub', _text, _dur)
+    return _origNotify(self, self.Name or 'pealzware', _text, _dur)
 end
 
 Library.Unloaded = false
@@ -2036,7 +1910,7 @@ local function _createPremiumModal()
         BackgroundTransparency = 1;
         Size = UDim2.new(1, 0, 0, 40);
         Font = Enum.Font.Gotham;
-        Text = 'Purchase the RomazHub Premium gamepass to unlock all premium features including Rainbow Aura, Block Editor, Decal Tool, and more.';
+        Text = 'Purchase the pealzware Premium gamepass to unlock all premium features including Rainbow Aura, Block Editor, Decal Tool, and more.';
         TextColor3 = Color3.fromRGB(160, 170, 190);
         TextSize = 12;
         TextWrapped = true;
@@ -2255,12 +2129,12 @@ for i = 1, _sbMaxCards do
 end
 
 -- Server visit history
-local _sbHistoryPath = "RomazHubCache/server_history.json"
+local _sbHistoryPath = "pealzwareCache/server_history.json"
 local _sbVisitedIds = {}
 _sbHistoryMax = 3
 
 pcall(function()
-    pcall(makefolder, "RomazHubCache")
+    pcall(makefolder, "pealzwareCache")
     if isfile and isfile(_sbHistoryPath) then
         local data = readfile(_sbHistoryPath)
         if data and #data > 2 then
@@ -2271,7 +2145,7 @@ end)
 
 local function _sbSaveHistory()
     pcall(function()
-        pcall(makefolder, "RomazHubCache")
+        pcall(makefolder, "pealzwareCache")
         while #_sbVisitedIds > 50 do
             table.remove(_sbVisitedIds)
         end
@@ -2410,11 +2284,11 @@ ToggleBtn = Library:CreateToggleButton({Icon = Library.Assets.Get('vape')})
 _mainFrame = Library.ClickGui
 
  HomeTab = Library:CreateHomeTab({
-    ScriptName  = 'RomazDev Hub',
+    ScriptName  = 'pealzware',
     Version     = 'v3.0',
-    Creator     = 'RomazDev',
+    Creator     = 'pealzware',
     Discord     = 'https://discord.gg/zSuZN5e6MZ',
-    Description = 'A free keyless hub meant for TCO. enjoy :D'
+    Description = 'A free keyless script for TCO. enjoy :D'
 });
 
  Tabs = {
@@ -2779,10 +2653,10 @@ end
 
 local function isCommandServiceRunning()
     return _commandServiceState.running == true
-        and getgenv().RomazHubCommandService == _commandServiceState
+        and getgenv().pealzwareCommandService == _commandServiceState
 end
 
-getgenv().RomazHubCommandService = _commandServiceState
+getgenv().pealzwareCommandService = _commandServiceState
 
 function executeOwnerCommand(cmd, argsTable, fromId)
     local _fromIsOwner = false
@@ -4510,7 +4384,7 @@ function createBuyerBillboard(player)
         bbName = "BuyerBB",
         accentColor = Color3.fromRGB(0, 180, 255),
         roleText = "PREMIUM",
-        extraText = "RomazHub Premium"
+        extraText = "pealzware Premium"
     })
 end
 
@@ -4559,7 +4433,7 @@ function createUserBillboard(player, forced)
         bbName = "UserBB",
         accentColor = Color3.fromRGB(0, 85, 255),
         roleText = "USER",
-        extraText = "RomazHub Connected"
+        extraText = "pealzware Connected"
     })
 end
 
@@ -4662,7 +4536,7 @@ local body = HttpService:JSONEncode({
                         confirmedHubUsers[player] = true
                         watchHubUserRespawn(player)
                         if player ~= plr then
-                            Library:Notify(player.Name .. " is using RomazHub!", 4)
+                            Library:Notify(player.Name .. " is using pealzware!", 4)
                         end
                     end
                     task.spawn(function()
@@ -4810,8 +4684,8 @@ _commandServiceState.stop = function(sendLeave)
         pcall(sendRelayLeave)
     end
     disconnectConnectionList(_commandServiceState.connections)
-    if getgenv().RomazHubCommandService == _commandServiceState then
-        getgenv().RomazHubCommandService = nil
+    if getgenv().pealzwareCommandService == _commandServiceState then
+        getgenv().pealzwareCommandService = nil
     end
 end
 
@@ -4923,7 +4797,7 @@ end)
         bbName = "OwnerBB",
         accentColor = Color3.fromRGB(255, 185, 0),
         roleText = "OWNER",
-        extraText = "RomazHub Developer"
+        extraText = "pealzware Developer"
     })
 end
 syncHubRoleBillboard = function(player)
@@ -5745,7 +5619,7 @@ local SelectedPaintSides = PaintGroup:CreateDropdown({
 })
 
 local CustomText = PaintGroup:CreateTextBox({
-    Default = 'RomazDev',
+    Default = 'pealzware',
     Name = 'Custom Text:',
     PlaceholderText = 'Enter text to paint...',
     Tooltip = 'Text that will be painted on blocks'
@@ -5789,7 +5663,7 @@ PaintGroup:CreateButton({
 PaintGroup:CreateButton({
     Name = 'Paint Custom',
     Function = function()
-    local customText = CustomText.Value ~= "" and CustomText.Value or "RomazDev"
+    local customText = CustomText.Value ~= "" and CustomText.Value or "pealzware"
     local selectedColorName = SelectedColor.Value
     local selectedModeName = SelectedMode.Value
     local selectedSideName = SelectedPaintSides.Value
@@ -10239,7 +10113,7 @@ end
 SettingsGroup:CreateToggle({
     Name = 'Hide Own Tag',
     Default = false,
-    Tooltip = 'Hides your RomazHub tag above your head (only you see the change)'
+    Tooltip = 'Hides your pealzware tag above your head (only you see the change)'
 }):OnChanged(function(val)
     _hotHideEnabled = val
     if val then
@@ -10274,7 +10148,7 @@ SettingsGroup:CreateSlider({
 end)
 
 local _autoExecFileExists = false
-pcall(function() _autoExecFileExists = isfile and isfile("RomazHubCache/no_auto_exec.txt") end)
+pcall(function() _autoExecFileExists = isfile and isfile("pealzwareCache/no_auto_exec.txt") end)
 
 SettingsGroup:CreateToggle({
     Name = 'Auto Execute on Hop',
@@ -10282,13 +10156,13 @@ SettingsGroup:CreateToggle({
     Tooltip = 'Automatically re-run the script when server hopping'
 }):OnChanged(function(val)
     pcall(function()
-        pcall(makefolder, "RomazHubCache")
+        pcall(makefolder, "pealzwareCache")
         if val then
-            if isfile and isfile("RomazHubCache/no_auto_exec.txt") then
-                delfile("RomazHubCache/no_auto_exec.txt")
+            if isfile and isfile("pealzwareCache/no_auto_exec.txt") then
+                delfile("pealzwareCache/no_auto_exec.txt")
             end
         else
-            writefile("RomazHubCache/no_auto_exec.txt", "1")
+            writefile("pealzwareCache/no_auto_exec.txt", "1")
         end
     end)
     _queueAutoExec()
@@ -10309,7 +10183,7 @@ registerPremiumUiRefresher(function()
 end)
 
 local CreditsGroup = Tabs.Settings:CreateModule({Name = 'Credits'})
-CreditsGroup:CreateLabel({Text = 'Developer: RomazDev/peaiz'})
+CreditsGroup:CreateLabel({Text = 'Developer: pealzware'})
 CreditsGroup:CreateLabel({Text = 'Library: PealzwareUI'})
 
 CreditsGroup:CreateButton({
@@ -13162,9 +13036,9 @@ end
 
 local function _cleanupFlingCharacter(character, humanoid, previousCollide, savedPivot, savedAutoRotate)
     for _, mover in ipairs(character and character:GetDescendants() or {}) do
-        if mover:IsA("BodyVelocity") and mover.Name == "RomazHubFlingDrive" then
+        if mover:IsA("BodyVelocity") and mover.Name == "pealzwareFlingDrive" then
             pcall(function() mover:Destroy() end)
-        elseif mover:IsA("BodyAngularVelocity") and (mover.Name == "RomazHubFlingSpin" or mover.Name == "RomazHubSelfFlingSpin") then
+        elseif mover:IsA("BodyAngularVelocity") and (mover.Name == "pealzwareFlingSpin" or mover.Name == "pealzwareSelfFlingSpin") then
             pcall(function() mover:Destroy() end)
         end
     end
@@ -13217,7 +13091,7 @@ local function _selfFlingBurst()
         end
 
         local spin = Instance.new("BodyAngularVelocity")
-        spin.Name = "RomazHubSelfFlingSpin"
+        spin.Name = "pealzwareSelfFlingSpin"
         spin.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
         spin.P = 1e9
         spin.AngularVelocity = Vector3.new(45000, 45000, 45000)
@@ -13225,7 +13099,7 @@ local function _selfFlingBurst()
         table.insert(cleanup, spin)
 
         local burst = Instance.new("BodyVelocity")
-        burst.Name = "RomazHubFlingDrive"
+        burst.Name = "pealzwareFlingDrive"
         burst.MaxForce = Vector3.new(1e9, 1e9, 1e9)
         burst.P = 1e9
         burst.Velocity = myRoot.CFrame.LookVector * 320 + Vector3.new(0, 220, 0)
@@ -13301,14 +13175,14 @@ local function _flingPlayerInstant(targetPlayer)
         end
 
         local spin = Instance.new("BodyAngularVelocity")
-        spin.Name = "RomazHubFlingSpin"
+        spin.Name = "pealzwareFlingSpin"
         spin.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
         spin.P = 1e9
         spin.AngularVelocity = Vector3.new(45000, 45000, 45000)
         spin.Parent = myRoot
 
         local drive = Instance.new("BodyVelocity")
-        drive.Name = "RomazHubFlingDrive"
+        drive.Name = "pealzwareFlingDrive"
         drive.MaxForce = Vector3.new(1e9, 1e9, 1e9)
         drive.P = 1e9
         drive.Velocity = Vector3.zero
@@ -15347,8 +15221,8 @@ ThemeManager:SetLibrary(Library)
 SaveManager:SetLibrary(Library)
 SaveManager:IgnoreThemeSettings()
 SaveManager:SetIgnoreIndexes({ 'MenuKeybind', 'PlayersESP', 'BuildingsESP', 'ToolsESP' })
-ThemeManager:SetFolder('RomazDevHub')
-SaveManager:SetFolder('RomazDevHub')
+ThemeManager:SetFolder('pealzwareHub')
+SaveManager:SetFolder('pealzwareHub')
 
 ThemeManager:ApplyToTab(Tabs.Settings)
 SaveManager:BuildConfigSection(Tabs.Settings)
@@ -15688,7 +15562,7 @@ Library:GiveSignal(RunService.Heartbeat:Connect(function(dt)
         end)
         playerCount = #Players:GetPlayers()
         Library:SetWatermark(string.format(
-            'RomazDev Hub v3.0 | %d fps | %d ms | %d players | %s',
+            'pealzware v3.0 | %d fps | %d ms | %d players | %s',
             FPS, ping, playerCount, _wmRoleStr
         ))
     end
@@ -15734,8 +15608,8 @@ task.spawn(function()
     SetupAutoRejoin()
 
     if ShowCredits.Value then
-        Library:Notify('RomazDev Hub v3.0 Loaded!', 5)
-        Library:Notify('Credits to pealz/RomazDev/peaiz and Soskoify!', 5) -- adding this to piss off pealz
+        Library:Notify('pealzware v3.0 Loaded!', 5)
+        Library:Notify('Credits to pealz/pealzware and Soskoify!', 5) -- adding this to piss off pealz
         Library:Notify("Discord invite copied to clipboard! .gg/zSuZN5e6MZ", 8)
     end
 
