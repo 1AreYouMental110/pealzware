@@ -3082,7 +3082,7 @@ function mainapi:CreateGUI()
 		local optionapi = {Bind = {'RightShift'}}
 
 		local button = Instance.new('TextButton')
-		button.Size = UDim2.fromOffset(220, 40)
+		button.Size = UDim2.fromOffset(220, 44)
 		button.BackgroundColor3 = uipallet.Main
 		button.BorderSizePixel = 0
 		button.AutoButtonColor = false
@@ -3171,7 +3171,7 @@ function mainapi:CreateGUI()
 
 		local button = Instance.new('TextButton')
 		button.Name = categorysettings.Name
-		button.Size = UDim2.fromOffset(220, 40)
+		button.Size = UDim2.fromOffset(220, 44)
 		button.BackgroundColor3 = uipallet.Main
 		button.BorderSizePixel = 0
 		button.AutoButtonColor = false
@@ -3518,7 +3518,7 @@ function mainapi:CreateGUI()
 
 		local button = Instance.new('TextButton')
 		button.Name = categorysettings.Name
-		button.Size = UDim2.fromOffset(220, 40)
+		button.Size = UDim2.fromOffset(220, 44)
 		button.BackgroundColor3 = uipallet.Main
 		button.BorderSizePixel = 0
 		button.AutoButtonColor = false
@@ -4234,7 +4234,7 @@ function mainapi:CreateCategory(categorysettings)
 
 		local modulebutton = Instance.new('TextButton')
 		modulebutton.Name = modulesettings.Name
-		modulebutton.Size = UDim2.fromOffset(220, 40)
+		modulebutton.Size = UDim2.fromOffset(220, 44)
 		modulebutton.BackgroundColor3 = uipallet.Main
 		modulebutton.BorderSizePixel = 0
 		modulebutton.AutoButtonColor = false
@@ -4255,7 +4255,7 @@ function mainapi:CreateCategory(categorysettings)
 		hoverline.Name = 'HoverLine'
 		hoverline.AnchorPoint = Vector2.new(0, 0.5)
 		hoverline.Position = UDim2.new(0, 0, 0.5, 0)
-		hoverline.Size = UDim2.fromOffset(0, 24)
+		hoverline.Size = UDim2.fromOffset(0, 28)
 		hoverline.BackgroundColor3 = uipallet.Text
 		hoverline.BackgroundTransparency = 1
 		hoverline.BorderSizePixel = 0
@@ -4271,16 +4271,22 @@ function mainapi:CreateCategory(categorysettings)
 		addTooltip(modulebutton, resolveTooltipText(modulesettings.Name, modulesettings.Tooltip, 'Module'))
 		addTooltip(bind, 'Click to bind')
 		addTooltip(favorite, 'Pin this module to the top of the tab')
+		-- Pin button: positioned to the right of the bind button (right edge of row),
+		-- styled as a small square button so it does not clip over the module name text.
 		favorite.Name = 'Favorite'
-		favorite.Size = UDim2.fromOffset(16, 16)
-		favorite.Position = UDim2.fromOffset(11, 12)
-		favorite.BackgroundTransparency = 1
+		favorite.Size = UDim2.fromOffset(20, 21)
+		favorite.Position = UDim2.new(1, -60, 0, 9)
+		favorite.AnchorPoint = Vector2.new(1, 0)
+		favorite.BackgroundColor3 = Color3.new(1, 1, 1)
+		favorite.BackgroundTransparency = 0.92
+		favorite.BorderSizePixel = 0
 		favorite.AutoButtonColor = false
 		favorite.Image = getcustomasset('pealzware/assets/new/pin.png')
 		favorite.ImageColor3 = color.Dark(uipallet.Text, 0.43)
 		favorite.ImageTransparency = 0.15
 		favorite.Visible = false
 		favorite.Parent = modulebutton
+		addCorner(favorite, UDim.new(0, 4))
 		bind.Name = 'Bind'
 		bind.Size = UDim2.fromOffset(20, 21)
 		bind.Position = UDim2.new(1, -36, 0, 9)
@@ -4371,21 +4377,20 @@ function mainapi:CreateCategory(categorysettings)
 		local favoriteHovered = false
 
 		local function updateFavoriteVisual(instant)
+			-- Pin is now a fixed-size button on the right edge — only tween colour/transparency.
 			local targetColor = moduleapi.Favorited and uipallet.Text or ((favoriteHovered or hovered) and uipallet.Text or color.Dark(uipallet.Text, 0.43))
+			local targetBkgTransp = moduleapi.Favorited and 0.7 or (favoriteHovered and 0.74 or 0.92)
 			local targetTransparency = moduleapi.Favorited and 0 or (favoriteHovered and 0 or 0.15)
-			local targetSize = UDim2.fromOffset(favoriteHovered and 17 or 16, favoriteHovered and 17 or 16)
 			if instant then
 				favorite.ImageColor3 = targetColor
 				favorite.ImageTransparency = targetTransparency
-				favorite.Size = targetSize
+				favorite.BackgroundTransparency = targetBkgTransp
 				return
 			end
 			tween:Tween(favorite, uipallet.TweenSmooth, {
 				ImageColor3 = targetColor,
-				ImageTransparency = targetTransparency
-			})
-			tween:Tween(favorite, favoriteHovered and uipallet.TweenBounce or uipallet.TweenSmooth, {
-				Size = targetSize
+				ImageTransparency = targetTransparency,
+				BackgroundTransparency = targetBkgTransp
 			})
 		end
 
@@ -4514,13 +4519,14 @@ function mainapi:CreateCategory(categorysettings)
 		end)
 		favorite.MouseButton1Down:Connect(function()
 			tween:Tween(favorite, uipallet.TweenClick, {
-				Size = UDim2.fromOffset(14, 14)
+				BackgroundTransparency = 0.5
 			})
 		end)
 		favorite.InputEnded:Connect(function(input)
 			if input.UserInputType == Enum.UserInputType.MouseButton1 then
+				-- Size is fixed; just restore background transparency.
 				tween:Tween(favorite, uipallet.TweenBounce, {
-					Size = UDim2.fromOffset(favoriteHovered and 17 or 16, favoriteHovered and 17 or 16)
+					BackgroundTransparency = favoriteHovered and 0.74 or 0.92
 				})
 			end
 		end)
@@ -4545,23 +4551,20 @@ function mainapi:CreateCategory(categorysettings)
 		end)
 		bindHoverGroup({modulebutton, bind, favorite, dotsbutton, bindcover}, function()
 			hovered = true
-			if moduleapi.Enabled then
+			-- Keep only background lift on hover — no text-colour flash.
+			if not moduleapi.Enabled then
 				tween:Tween(modulebutton, uipallet.TweenSmooth, {
-					TextColor3 = uipallet.Text
-				})
-			else
-				tween:Tween(modulebutton, uipallet.TweenSmooth, {
-					TextColor3 = uipallet.Text,
 					BackgroundColor3 = color.Light(uipallet.Main, 0.16)
 				})
 			end
+			-- Glow stroke (accent outline) + left hoverline sidebar.
 			tween:Tween(modulestroke, uipallet.TweenSmooth, {
 				Transparency = 0.18,
 				Thickness = 1.35
 			})
 			tween:Tween(hoverline, uipallet.TweenSmooth, {
 				BackgroundTransparency = 0.08,
-				Size = UDim2.fromOffset(4, 26)
+				Size = UDim2.fromOffset(4, 30)
 			})
 			tween:Tween(bind, uipallet.TweenSmooth, {
 				BackgroundTransparency = 0.74
@@ -4573,16 +4576,12 @@ function mainapi:CreateCategory(categorysettings)
 			hovered = false
 			if not moduleapi.Enabled and not modulechildren.Visible then
 				tween:Tween(modulebutton, uipallet.TweenSmooth, {
-					TextColor3 = color.Dark(uipallet.Text, 0.16),
 					BackgroundColor3 = uipallet.Main
 				})
 			elseif moduleapi.Enabled then
-				tween:Tween(modulebutton, uipallet.TweenSmooth, {
-					TextColor3 = uipallet.Text
-				})
+				-- no text change needed; enabled state keeps TextColor3 at full brightness
 			else
 				tween:Tween(modulebutton, uipallet.TweenSmooth, {
-					TextColor3 = uipallet.Text,
 					BackgroundColor3 = color.Light(uipallet.Main, 0.02)
 				})
 			end
@@ -4603,7 +4602,7 @@ function mainapi:CreateCategory(categorysettings)
 			if pressed then
 				pressed = false
 				tween:Tween(modulebutton, uipallet.TweenBounce, {
-					Size = UDim2.fromOffset(220, 40)
+					Size = UDim2.fromOffset(220, 44)
 				})
 			end
 		end)
@@ -4611,11 +4610,11 @@ function mainapi:CreateCategory(categorysettings)
 			pressed = true
 			if moduleapi.Enabled then
 				tween:Tween(modulebutton, uipallet.TweenFast, {
-					Size = UDim2.fromOffset(216, 38)
+					Size = UDim2.fromOffset(216, 42)
 				})
 			else
 				tween:Tween(modulebutton, uipallet.TweenFast, {
-					Size = UDim2.fromOffset(216, 38),
+					Size = UDim2.fromOffset(216, 42),
 					BackgroundColor3 = color.Light(uipallet.Main, 0.05)
 				})
 			end
@@ -4624,7 +4623,7 @@ function mainapi:CreateCategory(categorysettings)
 			if input.UserInputType == Enum.UserInputType.MouseButton1 and pressed then
 				pressed = false
 				tween:Tween(modulebutton, uipallet.TweenBounce, {
-					Size = UDim2.fromOffset(220, 40)
+					Size = UDim2.fromOffset(220, 44)
 				})
 			end
 		end)

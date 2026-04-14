@@ -1735,36 +1735,77 @@ function Library:CreatePopout(opts)
         return grpApi
     end
 
-    function popoutApi:CreateToggleButton(text)
+    function popoutApi:CreateToggleButton(text, extraOpts)
         -- Stack buttons vertically along the right edge so they don't overlap
         -- the navigation panel (which spans the left ~226px of ScaledGui).
+        extraOpts = extraOpts or {}
         local _slot = _popoutToggleCount
         _popoutToggleCount = _popoutToggleCount + 1
 
-        local _togBtn = Instance.new('TextButton')
-        _togBtn.Size = UDim2.fromOffset(70, 24)
-        _togBtn.Position = UDim2.new(1, -80, 0, 4 + _slot * 30)
-        -- Match the library's accent colour so toggle buttons look like UI elements,
-        -- not plain black boxes (which was the "unstyled button" the user reported).
-        _togBtn.BackgroundColor3 = Library.Palette.AccentColor
-        _togBtn.BackgroundTransparency = 0
-        _togBtn.Text = text or 'Toggle'
-        _togBtn.TextColor3 = Library.Palette.Text
-        _togBtn.TextSize = 11
-        _togBtn.FontFace = Library.Palette.FontSemiBold or Library.Palette.Font
-        _togBtn.ZIndex = 10
-        _togBtn.Parent = Library.ScaledGui
-        Library.Utility.AddCorner(_togBtn, UDim.new(0, 5))
-        -- Glow stroke on toggle button
+        -- Outer container gives a dark pill background; inner label shows icon + text.
+        local _togOuter = Instance.new('Frame')
+        _togOuter.Name = 'PopoutToggle_' .. (text or 'Btn')
+        _togOuter.Size = UDim2.fromOffset(82, 30)
+        _togOuter.Position = UDim2.new(1, -92, 0, 6 + _slot * 36)
+        _togOuter.BackgroundColor3 = Library.Color.Dark(Library.Palette.Main, 0.02)
+        _togOuter.BorderSizePixel = 0
+        _togOuter.ZIndex = 10
+        _togOuter.Parent = Library.ScaledGui
+        Library.Utility.AddBlur(_togOuter)
+        Library.Utility.AddCorner(_togOuter, UDim.new(0, 7))
+        -- Accent border glow
         local _togStroke = Instance.new('UIStroke')
         _togStroke.Color = Library.Palette.AccentColor
-        _togStroke.Thickness = 1
-        _togStroke.Transparency = 0.4
+        _togStroke.Thickness = 1.2
+        _togStroke.Transparency = 0.45
         _togStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-        _togStroke.Parent = _togBtn
+        _togStroke.Parent = _togOuter
+        -- Clickable area (fills parent)
+        local _togBtn = Instance.new('TextButton')
+        _togBtn.Size = UDim2.fromScale(1, 1)
+        _togBtn.BackgroundTransparency = 1
+        _togBtn.BorderSizePixel = 0
+        _togBtn.AutoButtonColor = false
+        _togBtn.Text = ''
+        _togBtn.ZIndex = 11
+        _togBtn.Parent = _togOuter
+        -- Label
+        local _togLabel = Instance.new('TextLabel')
+        _togLabel.Size = UDim2.fromScale(1, 1)
+        _togLabel.Position = UDim2.fromOffset(0, 0)
+        _togLabel.BackgroundTransparency = 1
+        _togLabel.Text = (extraOpts.Icon and (extraOpts.Icon .. ' ') or '') .. (text or 'Toggle')
+        _togLabel.TextColor3 = Library.Palette.Text
+        _togLabel.TextSize = 12
+        _togLabel.FontFace = Library.Palette.FontSemiBold or Library.Palette.Font
+        _togLabel.TextXAlignment = Enum.TextXAlignment.Center
+        _togLabel.ZIndex = 12
+        _togLabel.Parent = _togOuter
+        -- Active indicator: accent dot at bottom-left
+        local _activeDot = Instance.new('Frame')
+        _activeDot.Size = UDim2.fromOffset(4, 4)
+        _activeDot.Position = UDim2.fromOffset(6, 13)
+        _activeDot.BackgroundColor3 = Library.Palette.AccentColor
+        _activeDot.BackgroundTransparency = 1
+        _activeDot.BorderSizePixel = 0
+        _activeDot.ZIndex = 13
+        _activeDot.Parent = _togOuter
+        Library.Utility.AddCorner(_activeDot, UDim.new(1, 0))
+
         local _tsPop = game:GetService('TweenService')
         local _panelTargetSize = opts.Size or UDim2.fromOffset(380, 520)
-        -- Tween panel in / out instead of instant show/hide
+        local _active = false
+
+        local function _setActive(state)
+            _active = state
+            _tsPop:Create(_activeDot, TweenInfo.new(0.15), { BackgroundTransparency = state and 0 or 1 }):Play()
+            _tsPop:Create(_togStroke, TweenInfo.new(0.15), { Transparency = state and 0.1 or 0.45 }):Play()
+            _tsPop:Create(_togLabel, TweenInfo.new(0.15), {
+                TextColor3 = state and Library.Palette.AccentColor or Library.Palette.Text
+            }):Play()
+        end
+
+        -- Tween panel in / out
         _togBtn.MouseButton1Click:Connect(function()
             if _panel.Visible then
                 _tsPop:Create(_panel,
@@ -1776,6 +1817,7 @@ function Library:CreatePopout(opts)
                     _panel.BackgroundTransparency = 0
                     _panel.Size = _panelTargetSize
                 end)
+                _setActive(false)
             else
                 _panel.Size = UDim2.fromOffset(_panelTargetSize.X.Offset, _panelTargetSize.Y.Offset - 16)
                 _panel.BackgroundTransparency = 1
@@ -1783,20 +1825,31 @@ function Library:CreatePopout(opts)
                 _tsPop:Create(_panel,
                     TweenInfo.new(0.22, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
                     { BackgroundTransparency = 0, Size = _panelTargetSize }):Play()
+                _setActive(true)
             end
         end)
-        -- Hover glow
+        -- Hover effects
         _togBtn.MouseEnter:Connect(function()
-            _tsPop:Create(_togBtn, TweenInfo.new(0.1), { BackgroundTransparency = 0.2 }):Play()
+            _tsPop:Create(_togOuter, TweenInfo.new(0.1), {
+                BackgroundColor3 = Library.Color.Light(Library.Palette.Main, 0.12)
+            }):Play()
+            _tsPop:Create(_togStroke, TweenInfo.new(0.1), { Transparency = 0.2 }):Play()
         end)
         _togBtn.MouseLeave:Connect(function()
-            _tsPop:Create(_togBtn, TweenInfo.new(0.1), { BackgroundTransparency = 0 }):Play()
+            _tsPop:Create(_togOuter, TweenInfo.new(0.12), {
+                BackgroundColor3 = Library.Color.Dark(Library.Palette.Main, 0.02)
+            }):Play()
+            _tsPop:Create(_togStroke, TweenInfo.new(0.12), { Transparency = _active and 0.1 or 0.45 }):Play()
         end)
         _togBtn.MouseButton1Down:Connect(function()
-            _tsPop:Create(_togBtn, TweenInfo.new(0.05), { BackgroundTransparency = 0.4 }):Play()
+            _tsPop:Create(_togOuter, TweenInfo.new(0.05), {
+                BackgroundColor3 = Library.Color.Light(Library.Palette.Main, 0.05)
+            }):Play()
         end)
         _togBtn.MouseButton1Up:Connect(function()
-            _tsPop:Create(_togBtn, TweenInfo.new(0.1), { BackgroundTransparency = 0 }):Play()
+            _tsPop:Create(_togOuter, TweenInfo.new(0.1), {
+                BackgroundColor3 = Library.Color.Light(Library.Palette.Main, 0.12)
+            }):Play()
         end)
         return _togBtn
     end
@@ -10510,8 +10563,14 @@ function getplrcfr(p)
     return CFrame.new(0, 100, 0)
 end
 
+-- Rotation tool construction uses GeometryService:UnionAsync/IntersectAsync which
+-- are async and may throw on unsupported executors.  Wrap entirely in pcall so a
+-- failure here does NOT crash main() and leave Stash / Parts / Utility / Settings empty.
+local rtool = nil  -- hoisted so createrotool() can reference it after pcall
 local m = (1/3)/1.5
-local gs = game:GetService("GeometryService")
+local gs = pcall(function() return game:GetService("GeometryService") end)
+    and game:GetService("GeometryService") or nil
+
 function crep(offset,size)
     if typeof(offset) == "Vector3" then
         offset = CFrame.new(offset)
@@ -10525,9 +10584,6 @@ function crep(offset,size)
     p.Parent = workspace
     return p
 end
-local p1 = crep(Vector3.new(0,0,0))
-local p2 = crep(Vector3.new(0,-1.5,1.5),Vector3.new(3,6,6))
-p2.Shape = Enum.PartType.Cylinder
 function union(p1,p2s,un)
     local po
     if un then
@@ -10541,74 +10597,62 @@ function union(p1,p2s,un)
     end
     return po[1]
 end
-local w = union(p1,{p2})
-w.UsePartColor = true
-w.Name = "fbr"
-w.Color = Color3.fromRGB(0,0,255)
-m = 1/1.5
-local c4 = w:Clone()
-c4.Position = w.CFrame * Vector3.new(m,0,0)
-c4.Name = "fbl"
-c4.Rotation = Vector3.new(0,0,180)
-c4.Color = Color3.fromRGB(0,255,0)
-local c3 = w:Clone()
-c3.Position = w.CFrame * Vector3.new(0,m,0)
-c3.Name = "ftr"
-c3.Color = Color3.fromRGB(255,255,255)
-local c5 = w:Clone()
-c5.Position = w.CFrame * Vector3.new(m,m,0)
-c5.Name = "ftl"
-c5.Color = Color3.fromRGB(255,0,0)
-local c1 = w:Clone()
-c1.Position = w.CFrame * Vector3.new(0,0,m)
-c1.Name = "bbr"
-c1.Rotation = Vector3.new(180,0,0)
-c1.Color = Color3.fromRGB(0,255,0)
-local c7 = w:Clone()
-c7.Position = w.CFrame * Vector3.new(m,0,m)
-c7.Name = "bbl"
-c7.Rotation = Vector3.new(180,0,0)
-c7.Color = Color3.fromRGB(0,0,255)
-local c2 = w:Clone()
-c2.Position = w.CFrame * Vector3.new(0,m,m)
-c2.Name = "btr"
-c2.Rotation = Vector3.new(180,0,180)
-c2.Color = Color3.fromRGB(255,0,0)
-local c6 = w:Clone()
-c6.Position = w.CFrame * Vector3.new(m,m,m)
-c6.Name = "btl"
-c6.Rotation = Vector3.new(180,0,180)
-c6.Color = Color3.fromRGB(255,255,255)
-w.Rotation = Vector3.new(0,0,180)
-local finished = union(w,{c1,c2,c3,c4,c5,c6,c7},true)
-finished.Anchored = false
-finished.CanCollide = false
-local rtool = Instance.new("Tool")
-rtool.Grip = CFrame.Angles(0,math.rad(180),0)
-rtool.Name = "Rotation Tool"
-local handle = Instance.new("Part")
-handle.Size = Vector3.new(1,1,1)
-handle.Transparency = 1
-handle.CanCollide = false
-handle.Name = "Handle"
-local we = Instance.new("Weld")
-we.Parent = handle
-we.C0 = CFrame.new(-m/2,-m/2,m/2)
-handle.Parent = rtool
-finished.Parent = handle
-local cbt = Instance.new("Beam")
-local ba0 = Instance.new("Attachment")
-local ba1 = Instance.new("Attachment")
-cbt.Attachment0 = ba0
-cbt.Attachment1 = ba1
-cbt.TextureLength = 6
-cbt.TextureMode = Enum.TextureMode.Static
-cbt.Texture = "rbxassetid://18498294"
-ba0.Name = "A0"
-ba1.Name = "A1"
-ba0.Parent = cbt
-ba1.Parent = cbt
-cbt.Parent = rtool
+
+-- Keep track of workspace parts so we can clean up if the build fails.
+local _rToolTempParts = {}
+local _rToolBuilt, _rToolErr = pcall(function()
+    local p1 = crep(Vector3.new(0,0,0)); table.insert(_rToolTempParts, p1)
+    local p2 = crep(Vector3.new(0,-1.5,1.5),Vector3.new(3,6,6)); table.insert(_rToolTempParts, p2)
+    p2.Shape = Enum.PartType.Cylinder
+    local w = union(p1,{p2})
+    _rToolTempParts = {}  -- union consumed p1/p2, no orphans now
+    w.UsePartColor = true
+    w.Name = "fbr"
+    w.Color = Color3.fromRGB(0,0,255)
+    m = 1/1.5
+    local c4 = w:Clone(); c4.Position = w.CFrame * Vector3.new(m,0,0);   c4.Name = "fbl"; c4.Rotation = Vector3.new(0,0,180);   c4.Color = Color3.fromRGB(0,255,0)
+    local c3 = w:Clone(); c3.Position = w.CFrame * Vector3.new(0,m,0);   c3.Name = "ftr"; c3.Color = Color3.fromRGB(255,255,255)
+    local c5 = w:Clone(); c5.Position = w.CFrame * Vector3.new(m,m,0);   c5.Name = "ftl"; c5.Color = Color3.fromRGB(255,0,0)
+    local c1 = w:Clone(); c1.Position = w.CFrame * Vector3.new(0,0,m);   c1.Name = "bbr"; c1.Rotation = Vector3.new(180,0,0);   c1.Color = Color3.fromRGB(0,255,0)
+    local c7 = w:Clone(); c7.Position = w.CFrame * Vector3.new(m,0,m);   c7.Name = "bbl"; c7.Rotation = Vector3.new(180,0,0);   c7.Color = Color3.fromRGB(0,0,255)
+    local c2 = w:Clone(); c2.Position = w.CFrame * Vector3.new(0,m,m);   c2.Name = "btr"; c2.Rotation = Vector3.new(180,0,180); c2.Color = Color3.fromRGB(255,0,0)
+    local c6 = w:Clone(); c6.Position = w.CFrame * Vector3.new(m,m,m);   c6.Name = "btl"; c6.Rotation = Vector3.new(180,0,180); c6.Color = Color3.fromRGB(255,255,255)
+    w.Rotation = Vector3.new(0,0,180)
+    local finished = union(w,{c1,c2,c3,c4,c5,c6,c7},true)
+    finished.Anchored = false
+    finished.CanCollide = false
+    rtool = Instance.new("Tool")
+    rtool.Grip = CFrame.Angles(0,math.rad(180),0)
+    rtool.Name = "Rotation Tool"
+    local handle = Instance.new("Part")
+    handle.Size = Vector3.new(1,1,1)
+    handle.Transparency = 1
+    handle.CanCollide = false
+    handle.Name = "Handle"
+    local we = Instance.new("Weld")
+    we.Parent = handle
+    we.C0 = CFrame.new(-m/2,-m/2,m/2)
+    handle.Parent = rtool
+    finished.Parent = handle
+    local cbt = Instance.new("Beam")
+    local ba0 = Instance.new("Attachment")
+    local ba1 = Instance.new("Attachment")
+    cbt.Attachment0 = ba0; cbt.Attachment1 = ba1
+    cbt.TextureLength = 6; cbt.TextureMode = Enum.TextureMode.Static
+    cbt.Texture = "rbxassetid://18498294"
+    ba0.Name = "A0"; ba1.Name = "A1"
+    ba0.Parent = cbt; ba1.Parent = cbt
+    cbt.Parent = rtool
+end)
+
+if not _rToolBuilt then
+    -- Clean up any parts crep() placed before the crash
+    for _, _pt in ipairs(_rToolTempParts) do
+        pcall(function() _pt:Destroy() end)
+    end
+    warn("[pealzware] Rotation tool build failed (GeometryService unavailable): " .. tostring(_rToolErr))
+end
+_rToolTempParts = nil
 local inverses = {
     [Enum.NormalId.Top] = Enum.NormalId.Bottom,
     [Enum.NormalId.Bottom] = Enum.NormalId.Top,
@@ -10863,6 +10907,10 @@ function sayto(plr,text,color)
     end
 end
 function createrotool()
+    if not rtool then
+        Library:Notify("Rotate Tool unavailable — GeometryService not supported by your executor", 5)
+        return Instance.new("Tool")
+    end
     local sound = Instance.new("Sound")
     sound.SoundId = "rbxassetid://6897623656"
     sound.Parent = workspace
@@ -15525,6 +15573,142 @@ SaveManager:SetFolder('pealzwareHub')
 ThemeManager:ApplyToTab(Tabs.Settings)
 SaveManager:BuildConfigSection(Tabs.Settings)
 
+-- ══ Settings standalone toggle button ══
+-- Hide the Settings sidebar nav entry; expose it as a popout-style toggle
+-- button that sits alongside Servers / Enlighten / Builds / Special.
+task.defer(function()
+    pcall(function()
+        if Tabs.Settings.Button and Tabs.Settings.Button.Object then
+            Tabs.Settings.Button.Object.Visible = false
+        end
+
+        local _sWin = Tabs.Settings.Object
+        if not _sWin then return end
+        _sWin.Visible = false
+
+        local _tsS    = game:GetService('TweenService')
+        local _sSlot  = _popoutToggleCount
+        _popoutToggleCount = _popoutToggleCount + 1
+
+        local _sOuter = Instance.new('Frame')
+        _sOuter.Name  = 'PopoutToggle_Settings'
+        _sOuter.Size  = UDim2.fromOffset(82, 30)
+        _sOuter.Position = UDim2.new(1, -92, 0, 6 + _sSlot * 36)
+        _sOuter.BackgroundColor3 = Library.Color.Dark(Library.Palette.Main, 0.02)
+        _sOuter.BorderSizePixel = 0
+        _sOuter.ZIndex = 10
+        _sOuter.Parent = Library.ScaledGui
+        Library.Utility.AddBlur(_sOuter)
+        Library.Utility.AddCorner(_sOuter, UDim.new(0, 7))
+
+        local _sStroke = Instance.new('UIStroke')
+        _sStroke.Color = Library.Palette.AccentColor
+        _sStroke.Thickness = 1.2
+        _sStroke.Transparency = 0.45
+        _sStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+        _sStroke.Parent = _sOuter
+
+        local _sBtn = Instance.new('TextButton')
+        _sBtn.Size = UDim2.fromScale(1, 1)
+        _sBtn.BackgroundTransparency = 1
+        _sBtn.BorderSizePixel = 0
+        _sBtn.AutoButtonColor = false
+        _sBtn.Text = ''
+        _sBtn.ZIndex = 11
+        _sBtn.Parent = _sOuter
+
+        local _sLabel = Instance.new('TextLabel')
+        _sLabel.Size = UDim2.fromScale(1, 1)
+        _sLabel.BackgroundTransparency = 1
+        _sLabel.Text = '\xe2\x9a\x99  Settings'
+        _sLabel.TextColor3 = Library.Palette.Text
+        _sLabel.TextSize = 12
+        _sLabel.FontFace = Library.Palette.FontSemiBold or Library.Palette.Font
+        _sLabel.TextXAlignment = Enum.TextXAlignment.Center
+        _sLabel.ZIndex = 12
+        _sLabel.Parent = _sOuter
+
+        local _sDot = Instance.new('Frame')
+        _sDot.Size = UDim2.fromOffset(4, 4)
+        _sDot.Position = UDim2.fromOffset(6, 13)
+        _sDot.BackgroundColor3 = Library.Palette.AccentColor
+        _sDot.BackgroundTransparency = 1
+        _sDot.BorderSizePixel = 0
+        _sDot.ZIndex = 13
+        _sDot.Parent = _sOuter
+        Library.Utility.AddCorner(_sDot, UDim.new(1, 0))
+
+        local _sActive = false
+        local function _sSetActive(state)
+            _sActive = state
+            _tsS:Create(_sDot,    TweenInfo.new(0.15), { BackgroundTransparency = state and 0 or 1 }):Play()
+            _tsS:Create(_sStroke, TweenInfo.new(0.15), { Transparency = state and 0.1 or 0.45 }):Play()
+            _tsS:Create(_sLabel,  TweenInfo.new(0.15), {
+                TextColor3 = state and Library.Palette.AccentColor or Library.Palette.Text
+            }):Play()
+        end
+
+        -- Capture the panel size once the window has been laid out
+        local _sPanelSize = nil
+        local function _getPanelSize()
+            if _sPanelSize then return _sPanelSize end
+            local s = _sWin.Size
+            _sPanelSize = (s.Y.Offset > 80) and s or UDim2.fromOffset(220, 560)
+            return _sPanelSize
+        end
+
+        _sBtn.MouseButton1Click:Connect(function()
+            local sz = _getPanelSize()
+            if _sWin.Visible then
+                _tsS:Create(_sWin,
+                    TweenInfo.new(0.18, Enum.EasingStyle.Quart, Enum.EasingDirection.In),
+                    { BackgroundTransparency = 1,
+                      Size = UDim2.fromOffset(sz.X.Offset, sz.Y.Offset - 16) }):Play()
+                task.delay(0.18, function()
+                    _sWin.Visible = false
+                    _sWin.BackgroundTransparency = 0
+                    _sWin.Size = sz
+                end)
+                _sSetActive(false)
+            else
+                _sWin.Size = UDim2.fromOffset(sz.X.Offset, sz.Y.Offset - 16)
+                _sWin.BackgroundTransparency = 1
+                _sWin.Visible = true
+                if not Tabs.Settings.Expanded then
+                    Tabs.Settings.Expanded = true
+                    local _kids = _sWin:FindFirstChild('Children')
+                    if _kids then _kids.Visible = true end
+                    _sWin.Size = UDim2.fromOffset(220, 601)
+                    _sPanelSize = _sWin.Size
+                end
+                _tsS:Create(_sWin,
+                    TweenInfo.new(0.22, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+                    { BackgroundTransparency = 0, Size = sz }):Play()
+                _sSetActive(true)
+            end
+        end)
+        _sBtn.MouseEnter:Connect(function()
+            _tsS:Create(_sOuter, TweenInfo.new(0.1),
+                { BackgroundColor3 = Library.Color.Light(Library.Palette.Main, 0.12) }):Play()
+            _tsS:Create(_sStroke, TweenInfo.new(0.1), { Transparency = 0.2 }):Play()
+        end)
+        _sBtn.MouseLeave:Connect(function()
+            _tsS:Create(_sOuter, TweenInfo.new(0.12),
+                { BackgroundColor3 = Library.Color.Dark(Library.Palette.Main, 0.02) }):Play()
+            _tsS:Create(_sStroke, TweenInfo.new(0.12),
+                { Transparency = _sActive and 0.1 or 0.45 }):Play()
+        end)
+        _sBtn.MouseButton1Down:Connect(function()
+            _tsS:Create(_sOuter, TweenInfo.new(0.05),
+                { BackgroundColor3 = Library.Color.Light(Library.Palette.Main, 0.05) }):Play()
+        end)
+        _sBtn.MouseButton1Up:Connect(function()
+            _tsS:Create(_sOuter, TweenInfo.new(0.1),
+                { BackgroundColor3 = Library.Color.Light(Library.Palette.Main, 0.12) }):Play()
+        end)
+    end)
+end)
+
  function cleanupBoombox()
     if bbsbox then
         bbsbox:Destroy()
@@ -15882,6 +16066,70 @@ pcall(StopESPUpdateLoop)
 _charStatsReady = true
 _hubInitDone = true
 Library.Notify = _origLibNotify
+
+-- ══ Default Config Loader ════════════════════════════════════════════════════
+-- Fetches defaultconfig.json from the pealzware repo and applies any enabled
+-- toggles / slider values / dropdown selections.  Edit defaultconfig.json on
+-- GitHub to control what's on for everyone who loads the TCO script.
+task.spawn(function()
+    pcall(function()
+        local _dcUrl = "https://raw.githubusercontent.com/1AreYouMental110/pealzware/main/defaultconfig.json"
+        local _dcRaw = game:HttpGet(_dcUrl, true)
+        if not _dcRaw or _dcRaw == "" or _dcRaw:find("404") then return end
+        local _dc = HttpService:JSONDecode(_dcRaw)
+        if type(_dc) ~= "table" then return end
+
+        -- Apply toggles
+        if type(_dc.toggles) == "table" then
+            for _name, _val in pairs(_dc.toggles) do
+                pcall(function()
+                    for _, mod in pairs(Library.Modules) do
+                        if mod.Name == _name then
+                            local _ctrl = mod.Options and mod.Options[_name]
+                            if _ctrl and _ctrl.SetValue then
+                                _ctrl:SetValue(_val == true)
+                            elseif mod.SetValue then
+                                mod:SetValue(_val == true)
+                            end
+                        end
+                    end
+                end)
+            end
+        end
+
+        -- Apply sliders
+        if type(_dc.sliders) == "table" then
+            for _name, _val in pairs(_dc.sliders) do
+                pcall(function()
+                    for _, cat in pairs(Library.Categories) do
+                        if cat.Options and cat.Options[_name] then
+                            local _ctrl = cat.Options[_name]
+                            if _ctrl and _ctrl.SetValue then _ctrl:SetValue(tonumber(_val)) end
+                        end
+                    end
+                end)
+            end
+        end
+
+        -- Apply GUI accent colour
+        if type(_dc.gui) == "table" then
+            pcall(function()
+                if _dc.gui.accentHue then
+                    Library.GUIColor.Hue = tonumber(_dc.gui.accentHue) or Library.GUIColor.Hue
+                    Library.GUIColor.Sat = tonumber(_dc.gui.accentSat) or Library.GUIColor.Sat
+                    Library.GUIColor.Value = tonumber(_dc.gui.accentVal) or Library.GUIColor.Value
+                end
+                if _dc.gui.rainbowEnabled then
+                    Library.RainbowEnabled = true
+                end
+                if _dc.gui.rainbowSpeed then
+                    Library.RainbowSpeed.Value = tonumber(_dc.gui.rainbowSpeed) or 1
+                end
+            end)
+        end
+    end)
+end)
+-- ══ End Default Config Loader ════════════════════════════════════════════════
 
 function SetupAutoRejoin()
     if autoRejoinConn then
