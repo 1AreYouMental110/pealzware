@@ -16480,7 +16480,7 @@ do
         stroke.Thickness   = 1.5
         stroke.Transparency = 0.3
         stroke.Parent      = outer
-        Library and Library.Utility and pcall(function() Library.Utility.MakeDraggable(outer) end)
+        if Library and Library.Utility then pcall(function() Library.Utility.MakeDraggable(outer) end) end
 
         -- Compass N label
         local north = Instance.new("TextLabel")
