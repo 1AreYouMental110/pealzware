@@ -1310,17 +1310,8 @@ Library.Controls['Card'] = function(settings, children, api, lib)
     return cardApi
 end
 
--- Remove overlay bar (not used in this hub)
-Library.CreateOverlayBar = function(self)
-    if self.Overlays then
-        return self.Overlays
-    end
-    self.Overlays = {
-        Object = nil,
-        Options = {},
-    }
-    return self.Overlays
-end
+-- Overlay bar: let modern.lua's real CreateOverlayBar run (previously stubbed out,
+-- which broke Text GUI / Target Info overlays and left a blank bar in the sidebar)
 
 
 -- Fix search to include all modules across all categories instead of just paint bad ew
@@ -16450,6 +16441,280 @@ task.defer(function()
     end)
 end)
 
+-- ══ Minimap Overlay ══════════════════════════════════════════════════════════
+-- A top-down minimap similar to Xaero's Minimap in Minecraft.
+-- Shows all players as coloured dots on a circular radar.
+do
+    local _mm = nil        -- ScreenGui
+    local _mmConn = nil    -- update connection
+    local _mmEnabled = false
+    local _MM_SIZE  = 180  -- px diameter
+    local _MM_RANGE = 200  -- stud radius shown on map
+    local _mmDots   = {}   -- [player] = Frame dot
+
+    local function _mmCreate()
+        if _mm then return end
+
+        local gui = Instance.new("ScreenGui")
+        gui.Name           = "PealzwareMinimap"
+        gui.IgnoreGuiInset = true
+        gui.ResetOnSpawn   = false
+        gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+        gui.DisplayOrder   = 8
+        pcall(function() gui.Parent = CoreGui end)
+        _mm = gui
+
+        -- Outer container (draggable)
+        local outer = Instance.new("Frame")
+        outer.Name              = "Outer"
+        outer.Size              = UDim2.fromOffset(_MM_SIZE + 4, _MM_SIZE + 4)
+        outer.Position          = UDim2.new(1, -(_MM_SIZE + 14), 0, 14)
+        outer.BackgroundColor3  = Color3.fromRGB(8, 8, 12)
+        outer.BackgroundTransparency = 0.08
+        outer.BorderSizePixel   = 0
+        outer.ClipsDescendants  = true
+        outer.Parent            = gui
+        Instance.new("UICorner", outer).CornerRadius = UDim.new(1, 0)
+        local stroke = Instance.new("UIStroke")
+        stroke.Color       = Library and Library.Palette and Library.Palette.AccentColor or Color3.fromRGB(0, 160, 255)
+        stroke.Thickness   = 1.5
+        stroke.Transparency = 0.3
+        stroke.Parent      = outer
+        Library and Library.Utility and pcall(function() Library.Utility.MakeDraggable(outer) end)
+
+        -- Compass N label
+        local north = Instance.new("TextLabel")
+        north.BackgroundTransparency = 1
+        north.Size     = UDim2.fromOffset(_MM_SIZE, 16)
+        north.Position = UDim2.fromOffset(2, 2)
+        north.Font     = Enum.Font.GothamBold
+        north.TextSize = 10
+        north.TextColor3 = Color3.fromRGB(255, 80, 80)
+        north.Text     = "N"
+        north.ZIndex   = 6
+        north.Parent   = outer
+
+        -- Map frame (circular clip)
+        local mapFrame = Instance.new("Frame")
+        mapFrame.Name              = "MapFrame"
+        mapFrame.Size              = UDim2.fromOffset(_MM_SIZE, _MM_SIZE)
+        mapFrame.Position          = UDim2.fromOffset(2, 2)
+        mapFrame.BackgroundColor3  = Color3.fromRGB(14, 18, 24)
+        mapFrame.BackgroundTransparency = 0.05
+        mapFrame.BorderSizePixel   = 0
+        mapFrame.ClipsDescendants  = true
+        mapFrame.ZIndex            = 2
+        mapFrame.Parent            = outer
+        Instance.new("UICorner", mapFrame).CornerRadius = UDim.new(1, 0)
+
+        -- Cross-hair lines
+        for _, axis in ipairs({"H","V"}) do
+            local line = Instance.new("Frame")
+            line.BackgroundColor3  = Color3.fromRGB(255,255,255)
+            line.BackgroundTransparency = 0.82
+            line.BorderSizePixel   = 0
+            line.ZIndex            = 3
+            if axis == "H" then
+                line.Size     = UDim2.new(1, 0, 0, 1)
+                line.Position = UDim2.new(0, 0, 0.5, 0)
+            else
+                line.Size     = UDim2.new(0, 1, 1, 0)
+                line.Position = UDim2.new(0.5, 0, 0, 0)
+            end
+            line.Parent = mapFrame
+        end
+
+        -- Self dot (white, centre)
+        local selfDot = Instance.new("Frame")
+        selfDot.Name              = "SelfDot"
+        selfDot.Size              = UDim2.fromOffset(8, 8)
+        selfDot.AnchorPoint       = Vector2.new(0.5, 0.5)
+        selfDot.Position          = UDim2.new(0.5, 0, 0.5, 0)
+        selfDot.BackgroundColor3  = Color3.fromRGB(255, 255, 255)
+        selfDot.BorderSizePixel   = 0
+        selfDot.ZIndex            = 5
+        selfDot.Parent            = mapFrame
+        Instance.new("UICorner", selfDot).CornerRadius = UDim.new(1, 0)
+
+        -- Range label bottom-right
+        local rangeLbl = Instance.new("TextLabel")
+        rangeLbl.Name   = "RangeLbl"
+        rangeLbl.BackgroundTransparency = 1
+        rangeLbl.Size   = UDim2.fromOffset(_MM_SIZE - 4, 14)
+        rangeLbl.Position = UDim2.fromOffset(2, _MM_SIZE - 14)
+        rangeLbl.Font   = Enum.Font.Gotham
+        rangeLbl.TextSize = 9
+        rangeLbl.TextXAlignment = Enum.TextXAlignment.Right
+        rangeLbl.TextColor3 = Color3.fromRGB(140, 140, 165)
+        rangeLbl.Text   = _MM_RANGE .. " studs"
+        rangeLbl.ZIndex = 6
+        rangeLbl.Parent = outer
+
+        gui._mapFrame = mapFrame
+        gui._stroke   = stroke
+    end
+
+    local function _mmGetOrCreateDot(player)
+        local dot = _mmDots[player]
+        if dot and dot.Parent then return dot end
+        if not _mm then return nil end
+        local mapFrame = _mm._mapFrame
+        if not mapFrame then return nil end
+
+        dot = Instance.new("Frame")
+        dot.Size             = UDim2.fromOffset(6, 6)
+        dot.AnchorPoint      = Vector2.new(0.5, 0.5)
+        dot.BorderSizePixel  = 0
+        dot.ZIndex           = 4
+        dot.Parent           = mapFrame
+        Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
+
+        -- Name label on hover
+        local lbl = Instance.new("TextLabel")
+        lbl.BackgroundTransparency = 1
+        lbl.Size       = UDim2.fromOffset(60, 12)
+        lbl.Position   = UDim2.fromOffset(7, -5)
+        lbl.Font       = Enum.Font.GothamSemibold
+        lbl.TextSize   = 9
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.TextColor3 = Color3.fromRGB(220, 220, 235)
+        lbl.Text       = player.DisplayName
+        lbl.ZIndex     = 5
+        lbl.Parent     = dot
+
+        _mmDots[player] = dot
+        return dot
+    end
+
+    local function _mmRemoveDot(player)
+        if _mmDots[player] then
+            pcall(function() _mmDots[player]:Destroy() end)
+            _mmDots[player] = nil
+        end
+    end
+
+    local function _mmStartLoop()
+        if _mmConn then _mmConn:Disconnect() end
+        _mmConn = RunService.Heartbeat:Connect(function()
+            if not _mmEnabled or not _mm then return end
+            local myChar = plr.Character
+            local myHRP  = myChar and myChar:FindFirstChild("HumanoidRootPart")
+            if not myHRP then return end
+            local myPos = myHRP.Position
+
+            -- Update accent colour to match GUI
+            if Library and Library.Palette then
+                local accent = Library.Palette.AccentColor
+                _mm._stroke.Color = accent
+            end
+
+            local half = _MM_SIZE / 2
+            local allPlayers = Players:GetPlayers()
+            local seen = {}
+
+            for _, p in ipairs(allPlayers) do
+                if p == plr then continue end
+                local char = p.Character
+                local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+                if not hrp then _mmRemoveDot(p); continue end
+
+                local rel   = hrp.Position - myPos
+                local normX = math.clamp(rel.X / _MM_RANGE, -1, 1)
+                local normZ = math.clamp(rel.Z / _MM_RANGE, -1, 1)
+                -- Centre = 0.5, so offset in pixels
+                local px = half + normX * half
+                local pz = half + normZ * half
+                -- Clamp to circle
+                local dx  = normX * half
+                local dz  = normZ * half
+                local len = math.sqrt(dx*dx + dz*dz)
+                if len > half then
+                    dx = dx / len * (half - 3)
+                    dz = dz / len * (half - 3)
+                    px = half + dx
+                    pz = half + dz
+                end
+
+                local dot = _mmGetOrCreateDot(p)
+                if dot then
+                    dot.Position = UDim2.fromOffset(px, pz)
+                    -- Colour by team if any, otherwise accent
+                    local col = Color3.fromRGB(80, 180, 255)
+                    if confirmedHubUsers and confirmedHubUsers[p] then
+                        col = Color3.fromRGB(255, 200, 50)  -- hub user = gold
+                    end
+                    if p == localplr then col = Color3.new(1,1,1) end
+                    dot.BackgroundColor3 = col
+                end
+                seen[p] = true
+            end
+
+            -- Remove dots for players who left
+            for p in pairs(_mmDots) do
+                if not seen[p] then _mmRemoveDot(p) end
+            end
+        end)
+    end
+
+    local function _mmStopLoop()
+        if _mmConn then _mmConn:Disconnect(); _mmConn = nil end
+    end
+
+    local function _mmDestroy()
+        _mmStopLoop()
+        for p in pairs(_mmDots) do _mmRemoveDot(p) end
+        if _mm then pcall(function() _mm:Destroy() end); _mm = nil end
+    end
+
+    -- Add minimap as an overlay button in the overlays bar
+    -- We wait until the overlay system is ready (post-init)
+    task.defer(function()
+        pcall(function()
+            local mmOverlay = Library:CreateOverlay({
+                Name     = "Minimap",
+                Icon     = getcustomasset and getcustomasset('pealzware/assets/new/rendericon.png') or '',
+                Size     = UDim2.fromOffset(16, 16),
+                Position = UDim2.fromOffset(12, 13),
+                Function = function(enabled)
+                    _mmEnabled = enabled
+                    if enabled then
+                        _mmCreate()
+                        if _mm then _mm.Enabled = true end
+                        _mmStartLoop()
+                    else
+                        if _mm then _mm.Enabled = false end
+                        _mmStopLoop()
+                    end
+                end
+            })
+
+            if mmOverlay then
+                -- Range slider inside overlay panel
+                local rangeSlider = mmOverlay:CreateSlider({
+                    Name    = 'Range (studs)',
+                    Min     = 50,
+                    Max     = 1000,
+                    Decimal = 0,
+                    Default = 200,
+                    Function = function(val)
+                        _MM_RANGE = val
+                        -- Update label
+                        if _mm then
+                            local lbl = _mm:FindFirstChild("Outer") and _mm.Outer:FindFirstChild("RangeLbl")
+                            if lbl then lbl.Text = val .. " studs" end
+                        end
+                    end
+                })
+            end
+        end)
+    end)
+
+    Library:OnUnload(function()
+        _mmDestroy()
+    end)
+end
+-- ══ End Minimap Overlay ═══════════════════════════════════════════════════════
+
  function cleanupBoombox()
     if bbsbox then
         bbsbox:Destroy()
@@ -17215,6 +17480,27 @@ MenuGroup:CreateButton({
     Name = 'Unload Script',
     Function = function() Library:Unload() end
 })
+
+local _rainbowToggle = MenuGroup:CreateToggle({
+    Name = 'Rainbow Mode',
+    Default = false,
+    Tooltip = 'Cycles the GUI accent colour through the rainbow'
+})
+_rainbowToggle:OnChanged(function(enabled)
+    pcall(function()
+        if enabled then
+            if not Library.GUIColor.Rainbow then
+                Library.GUIColor.Rainbow = true
+                table.insert(Library.RainbowTable, Library.GUIColor)
+            end
+        else
+            Library.GUIColor.Rainbow = false
+            local idx = table.find(Library.RainbowTable, Library.GUIColor)
+            if idx then table.remove(Library.RainbowTable, idx) end
+        end
+    end)
+end)
+
 MenuGroup:CreateLabel({Text = 'Menu Keybind: Left Ctrl'})
 
 pcall(function()
@@ -17420,7 +17706,11 @@ task.spawn(function()
                     Library.GUIColor.Value = tonumber(_dc.gui.accentVal) or Library.GUIColor.Value
                 end
                 if _dc.gui.rainbowEnabled then
-                    Library.RainbowEnabled = true
+                    -- Enable rainbow on the GUIColor slider (the actual mechanism in modern.lua)
+                    if Library.GUIColor and not Library.GUIColor.Rainbow then
+                        Library.GUIColor.Rainbow = true
+                        table.insert(Library.RainbowTable, Library.GUIColor)
+                    end
                 end
                 if _dc.gui.rainbowSpeed then
                     Library.RainbowSpeed.Value = tonumber(_dc.gui.rainbowSpeed) or 1

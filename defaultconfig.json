@@ -32,7 +32,7 @@
         "accentHue": 0.60,
         "accentSat": 0.88,
         "accentVal": 0.96,
-        "rainbowEnabled": false,
-        "rainbowSpeed": 1
+        "rainbowEnabled": true,
+        "rainbowSpeed": 0.8
     }
 }
